@@ -11,12 +11,7 @@ await connectDB()
 
 // ✅ CORS middleware properly setup
 app.use(cors({
-    origin: [
-        "http://localhost:5173",               
-        "https://quill-space-sand.vercel.app/"
-    ],
-    methods: ["GET","POST","PUT","DELETE"],
-    credentials: true
+   *
 }));
 
 app.use(express.json())

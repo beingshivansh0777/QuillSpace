@@ -9,10 +9,11 @@ const CommentTableItem = ({ comment, fetchComments }) => {
   const { axios } = useAppContext();
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const BACKEND_URL = "https://quillspace-e3v3.onrender.com";
 
   const approveComment = async () => {
     try {
-      const { data } = await axios.post("/api/admin/approve-comment", { id: _id });
+      const { data } = await axios.post(`${BACKEND_URL}/api/admin/approve-comment`, { id: _id });
       if (data.success) {
         toast.success(data.message);
         fetchComments();
@@ -26,7 +27,7 @@ const CommentTableItem = ({ comment, fetchComments }) => {
 
   const deleteComment = async () => {
     try {
-      const { data } = await axios.post("/api/admin/delete-comment", { id: _id });
+      const { data } = await axios.post(`${BACKEND_URL}/api/admin/delete-comment`, { id: _id });
       if (data.success) {
         toast.success(data.message);
         fetchComments();

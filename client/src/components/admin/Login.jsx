@@ -13,12 +13,14 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false); // 👈 Toggle state
 
+  const BACKEND_URL = "https://quillspace-e3v3.onrender.com";
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data } = await axios.post("/api/admin/login", { email, password });
+      const { data } = await axios.post(`${BACKEND_URL}/api/admin/login`, { email, password });
 
       if (data.success) {
         setToken(data.token);

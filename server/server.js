@@ -9,16 +9,14 @@ const app = express();
 
 await connectDB()
 
-// ✅ Middlewares
-const allowedOrigins = [
-  "http://localhost:5173",               // local Vite frontend
-  "https://quill-space-sand.vercel.app/"     // apna actual Vercel frontend URL daal yaha
-];
-
+// ✅ CORS middleware properly setup
 app.use(cors({
-  origin: allowedOrigins,
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
+    origin: [
+        "http://localhost:5173",               
+        "https://quill-space-sand.vercel.app/"
+    ],
+    methods: ["GET","POST","PUT","DELETE"],
+    credentials: true
 }));
 
 app.use(express.json())

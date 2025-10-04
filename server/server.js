@@ -10,7 +10,11 @@ const app = express();
 await connectDB()
 
 // ✅ CORS middleware properly setup
-app.use(cors({ origin: "*" }));
+app.use(cors({
+  origin: ["https://quill-space-one.vercel.app"], // frontend URL
+  methods: ["GET","POST","PUT","DELETE"],
+  credentials: true
+}));
 
 app.use(express.json())
 

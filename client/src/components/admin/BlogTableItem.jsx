@@ -10,9 +10,11 @@ const BlogTableItem = ({ blog, fetchBlogs, index }) => {
   const { axios } = useAppContext();
   const [isModalOpen, setModalOpen] = useState(false);
 
+  const BACKEND_URL = "https://quillspace-e3v3.onrender.com";
+
   const deleteBlog = async () => {
     try {
-      const { data } = await axios.post("/api/blog/delete", { id: blog._id });
+      const { data } = await axios.post(`${BACKEND_URL}/api/blog/delete`, { id: blog._id });
       if (data.success) {
         toast.success(data.message);
         await fetchBlogs();
@@ -26,7 +28,7 @@ const BlogTableItem = ({ blog, fetchBlogs, index }) => {
 
   const togglePublish = async () => {
     try {
-      const { data } = await axios.post("/api/blog/toggle-publish", {
+      const { data } = await axios.post(`${BACKEND_URL}/api/blog/toggle-publish`, {
         id: blog._id,
       });
       if (data.success) {

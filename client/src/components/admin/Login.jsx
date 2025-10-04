@@ -13,31 +13,30 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false); // 👈 Toggle state
 
- const handleSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
-  try {
-    const { data } = await axios.post(
-      `${import.meta.env.VITE_API_URL}/api/admin/login`,
-      { email, password }
-    );
 
-    if (data.success) {
-      setToken(data.token);
-      localStorage.setItem("token", data.token);
-      axios.defaults.headers.common["Authorization"] = data.token;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { data } = await axios.post("/api/admin/login", { email, password });
 
-      toast.success("Login successful!");
-      navigate("/admin");
-    } else {
-      toast.error(data.message || "Invalid credentials");
-    }
-  } catch (error) {
-    toast.error(error.response?.data?.message || error.message);
-  } finally {
-    setLoading(false);
-  }
-};
+      if (data.success) {
+        setToken(data.token);
+        localStorage.setItem("token", data.token);
+        axios.defaults.headers.common["Authorization"] = data.token;
+
+        toast.success("Login successful!");
+        navigate("/admin"); // redirect to dashboard
+      } else {
+        toast.error(data.message || "Invalid credentials");
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message);
+    } finally {
+      setLoading(false);
+    } 
+  };
+
 
   return (
     <div className="flex items-center justify-center h-screen bg-gradient-to-br from-gray-50 to-gray-100">

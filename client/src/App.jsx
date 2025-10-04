@@ -9,7 +9,7 @@ import AddBlog from './pages/admin/AddBlog.jsx'
 import ListBlog from './pages/admin/ListBlog.jsx'
 import Comments from './pages/admin/Comments.jsx'
 import Login from './components/admin/Login.jsx'
-import Footer from './components/Footer.jsx'
+
 import 'quill/dist/quill.snow.css'
 import {Toaster} from 'react-hot-toast'
 import { useAppContext } from './context/AppContext.jsx'
@@ -32,7 +32,7 @@ const App = () => {
              <Route path='comments' element={<Comments/>}/>
         </Route>
        </Routes>
-       <Footer/>
+     
     </div>
   )
 }

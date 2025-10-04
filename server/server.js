@@ -10,9 +10,7 @@ const app = express();
 await connectDB()
 
 // ✅ CORS middleware properly setup
-app.use(cors({
-   *
-}));
+app.use(cors({ origin: "*" }));
 
 app.use(express.json())
 

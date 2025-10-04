@@ -10,6 +10,7 @@ const BlogTableItem = ({ blog, fetchBlogs, index }) => {
   const { axios } = useAppContext();
   const [isModalOpen, setModalOpen] = useState(false);
 
+
   const deleteBlog = async () => {
     try {
       const { data } = await axios.post("/api/blog/delete", { id: blog._id });

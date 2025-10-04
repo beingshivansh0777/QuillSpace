@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useAppContext } from "../../context/AppContext";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai"; // 👁️ Eye icons
+import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai"; 
 
 const Login = () => {
   const { axios, setToken } = useAppContext();
@@ -11,7 +11,7 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // 👈 Toggle state
+  const [showPassword, setShowPassword] = useState(false); 
 
   const handleSubmit = async (e) => {
     e.preventDefault();

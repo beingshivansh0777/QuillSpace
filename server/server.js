@@ -4,6 +4,7 @@ import cors from 'cors'
 import connectDB from './configs/db.js';
 import adminRouter from './routes/adminRoutes.js';
 import blogRouter from './routes/blogRoutes.js';
+import authRouter from "./routes/authRoutes.js";
 
 const app = express();
 const PORT =process.env.PORT || 3000;
@@ -19,6 +20,7 @@ app.use(express.json())
 app.get('/',(req,res) => res.send("API is working"))
 app.use('/api/admin',adminRouter)
 app.use('/api/blog',blogRouter)
+app.use("/api/auth", authRouter);   
 
 app.listen(PORT,() => {
     console.log('Server is running on port'  +  PORT)

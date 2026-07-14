@@ -1,21 +1,20 @@
 import express from "express";
 import {
-  adminLogin,
-  approveCommentbyId,
-  deleteCommentbyId,
-  getAllBlogsAdmin,
-  getAllComments,
-  getDashboard,
-} from "../contollers/adminController.js";
-import auth from "../middleware/auth.js";
+    getAllBlogsAdmin,
+    getAllComments,
+    getDashboard,
+    deleteCommentbyId,
+    approveCommentbyId,
+} from "../controllers/adminController.js";
+import adminAuth from "../middleware/adminAuth.js";
 
 const adminRouter = express.Router();
 
-adminRouter.post("/login", adminLogin);
-adminRouter.get("/comments", auth, getAllComments);
-adminRouter.get("/blogs", auth, getAllBlogsAdmin);
-adminRouter.post("/delete-comment", auth, deleteCommentbyId);
-adminRouter.post("/approve-comment", auth, approveCommentbyId);
-adminRouter.get("/dashboard", auth, getDashboard);
+// ✅ All routes protected by adminAuth — only role:"admin" can access
+adminRouter.get("/blogs",            adminAuth, getAllBlogsAdmin);
+adminRouter.get("/comments",         adminAuth, getAllComments);
+adminRouter.get("/dashboard",        adminAuth, getDashboard);
+adminRouter.post("/delete-comment",  adminAuth, deleteCommentbyId);
+adminRouter.post("/approve-comment", adminAuth, approveCommentbyId);
 
 export default adminRouter;

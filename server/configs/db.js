@@ -5,10 +5,16 @@ const connectDB = async () => {
     mongoose.connection.on("connected", () =>
       console.log("Database Connected")
     );
-    await mongoose.connect(`${process.env.MONGODB_URI}/quillspace`);
+    mongoose.connection.on("error", (err) =>
+      console.log("Database connection error:", err.message)
+    );
+
+    await mongoose.connect(`${process.env.MONGODB_URI}/quillspace`, {
+      serverSelectionTimeoutMS: 10000, 
+    });
   } catch (error) {
-    console.log(error.message);
+    console.log("Failed to connect to DB:", error.message);
   }
 };
 
-export  default connectDB;
+export default connectDB;

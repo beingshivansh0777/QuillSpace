@@ -11,9 +11,11 @@ export const AppProvider = ({children}) => {
       
     const navigate =useNavigate();
     const [token,setToken]=useState(null)
+    const [user,setUser]=useState(null)
     const [blogs,setBlogs]=useState([])
     const [input,setInput]=useState("")
-      
+
+    // ---- Blogs ----
     const fetchBlogs =async() => {
         try {
             const {data} = await axios.get('/api/blog/all');
@@ -22,18 +24,47 @@ export const AppProvider = ({children}) => {
              toast.error(error.message)
         }
     }
-     
+
+    // ---- Logged-in user profile (for navbar avatar) ----
+    const fetchUser = async () => {
+        try {
+            const { data } = await axios.get('/api/auth/me');
+            if (data.success) {
+                setUser(data.user);
+            }
+        } catch (error) {
+            // token may be invalid/expired — fail silently here
+        }
+    }
+
+    const logout = () => {
+        localStorage.removeItem('token');
+        delete axios.defaults.headers.common['Authorization'];
+        setToken(null);
+        setUser(null);
+        navigate('/');
+    }
+
     useEffect(() => {
         fetchBlogs();
         const token = localStorage.getItem('token')
         if(token) {
             setToken(token)
-            axios.defaults.headers.common['Authorization'] = `${token}`;
+            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         }
     },[])
 
+    useEffect(() => {
+        if (token) {
+            fetchUser();
+        } else {
+            setUser(null);
+        }
+    }, [token]);
+
      const value = {
-        axios, navigate, token, setToken, blogs, setBlogs , input ,setInput
+        axios, navigate, token, setToken, user, setUser, logout,
+        blogs, setBlogs , input ,setInput
      }
 
     return (
@@ -47,4 +78,4 @@ export const AppProvider = ({children}) => {
 
 export const useAppContext = () => {
     return useContext(AppContext)
-}
+} 

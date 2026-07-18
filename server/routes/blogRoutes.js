@@ -8,6 +8,7 @@ import {
   getBlogById,
   getBlogComments,
   togglePublish,
+  voteBlog,
 } from "../contollers/blogController.js";
 import upload from "../middleware/multer.js";
 import auth from "../middleware/auth.js";
@@ -19,8 +20,9 @@ blogRouter.get("/all", getAllBlogs);
 blogRouter.get("/:blogId", getBlogById);
 blogRouter.post("/delete", auth, deleteBlogById);
 blogRouter.post("/toggle-publish", auth, togglePublish);
-blogRouter.post("/add-comment", addComment);
+blogRouter.post("/add-comment", auth, addComment);
 blogRouter.post("/comments", getBlogComments);
-blogRouter.post("/generate",auth, generateContent);
+blogRouter.post("/generate", auth, generateContent);
+blogRouter.post("/vote", voteBlog);   
 
 export default blogRouter;

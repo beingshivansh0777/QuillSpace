@@ -5,7 +5,7 @@ import {
     getDashboard,
     deleteCommentbyId,
     approveCommentbyId,
-} from "../controllers/adminController.js";
+} from "../contollers/adminController.js";
 import adminAuth from "../middleware/adminAuth.js";
 
 const adminRouter = express.Router();

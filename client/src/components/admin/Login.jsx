@@ -3,6 +3,7 @@ import { useAppContext } from "../../context/AppContext";
 import { useNavigate, Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
+import { GoogleLogin } from "@react-oauth/google";
 
 const Login = () => {
     const { axios, setToken } = useAppContext();
@@ -15,6 +16,16 @@ const Login = () => {
     const [loading, setLoading]   = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
+    const handleAuthSuccess = (data, defaultSuccessMessage) => {
+        setToken(data.token);
+        localStorage.setItem("token", data.token);
+        axios.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
+
+        toast.success(data.message || defaultSuccessMessage);
+
+        data.role === "admin" ? navigate("/admin") : navigate("/");
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -25,20 +36,10 @@ const Login = () => {
             const { data } = await axios.post(endpoint, payload);
 
             if (data.success) {
-                setToken(data.token);
-                localStorage.setItem("token", data.token);
-                // ✅ Send Bearer token in all future requests
-                axios.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
-
-                toast.success(isRegister ? "Registered successfully!" : "Login successful!");
-
-                // ✅ Redirect based on role
-                data.role === "admin" ? navigate("/admin") : navigate("/");
-
+                handleAuthSuccess(data, isRegister ? "Registered successfully!" : "Login successful!");
             } else {
                 toast.error(data.message || "Something went wrong.");
 
-                // ✅ Auto switch to login if user already exists
                 if (data.redirectToLogin) {
                     setIsRegister(false);
                 }
@@ -50,89 +51,198 @@ const Login = () => {
         }
     };
 
-    return (
-        <div className="flex items-center justify-center h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-            <div className="relative w-full max-w-sm p-6 bg-white bg-opacity-70 backdrop-blur-md border border-primary/30 shadow-xl shadow-primary/15 rounded-lg overflow-hidden">
-                <div className="absolute inset-0 rounded-lg border-2 border-transparent bg-gradient-to-r from-primary via-pink-500 to-purple-500 opacity-40 animate-[spin_6s_linear_infinite]" />
+    const handleGoogleSuccess = async (credentialResponse) => {
+        try {
+            const { data } = await axios.post("/api/auth/google", {
+                credential: credentialResponse.credential,
+                mode: isRegister ? "register" : "login",
+            });
 
-                <div className="relative z-10 flex flex-col items-center justify-center">
-                    <div className="w-full py-6 text-center">
-                        <h1 className="text-4xl md:text-5xl font-bold tracking-wide">
-                            <span className="text-primary">{isRegister ? "Register" : "Login"}</span>
-                        </h1>
-                        <p className="font-light">
-                            {isRegister ? "Create your QuillSpace account." : "Welcome back to QuillSpace."}
+            if (data.success) {
+                handleAuthSuccess(data, "Signed in with Google!");
+            } else {
+                toast.error(data.message || "Google sign-in failed.");
+                if (data.redirectToLogin) {
+                    setIsRegister(false);
+                }
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.message || error.message);
+        }
+    };
+
+    return (
+        <div className="min-h-screen flex flex-col lg:flex-row font-[Outfit]">
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500&display=swap');
+                .ql-display { font-family: 'Instrument Serif', serif; }
+                .ql-eyebrow { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.14em; }
+                .ql-stroke {
+                    stroke-dasharray: 340;
+                    stroke-dashoffset: 340;
+                    animation: ql-draw 1.4s 0.3s ease-out forwards;
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .ql-stroke { animation: none; stroke-dashoffset: 0; }
+                }
+                @keyframes ql-draw {
+                    to { stroke-dashoffset: 0; }
+                }
+            `}</style>
+
+            {/* Left panel — editorial / brand side */}
+            <div className="relative lg:w-[46%] lg:min-h-screen flex flex-col justify-between overflow-hidden px-6 sm:px-10 lg:px-14 py-8 sm:py-10 lg:py-14 bg-[linear-gradient(160deg,_#1B1830_0%,_#2E1F66_65%,_#3B2C7A_100%)]">
+                {/* decorative oversized quote mark — hidden on small phones, too dominant there */}
+                <span className="ql-display pointer-events-none select-none absolute -top-6 -left-2 text-[120px] sm:text-[180px] lg:text-[220px] leading-none text-white/[0.05] hidden sm:block">
+                    &ldquo;
+                </span>
+
+                <Link
+                    to="/"
+                    className="relative z-10 w-fit text-white/70 hover:text-white text-sm transition-colors"
+                >
+                    ← Back to QuillSpace
+                </Link>
+
+                <div className="relative z-10">
+                    <p className="ql-eyebrow text-[10px] sm:text-[11px] text-[#C9A227] mb-4 sm:mb-6">
+                        WELCOME TO QUILLSPACE
+                    </p>
+                    <h1 className="ql-display text-2xl sm:text-4xl lg:text-5xl leading-[1.2] lg:leading-[1.15] text-white max-w-md">
+                        Every great story starts with a single word.
+                    </h1>
+
+                    <svg
+                        width="180"
+                        height="24"
+                        viewBox="0 0 180 24"
+                        fill="none"
+                        className="mt-4 sm:mt-6 max-w-[140px] sm:max-w-none"
+                        aria-hidden="true"
+                    >
+                        <path
+                            className="ql-stroke"
+                            d="M2 18 C 40 4, 70 22, 100 10 S 150 2, 178 12"
+                            stroke="#5044E5"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                        />
+                    </svg>
+                </div>
+
+                <p className="relative z-10 text-white/50 text-sm max-w-xs hidden sm:block">
+                    Join thousands of writers publishing, discussing, and discovering
+                    ideas worth reading.
+                </p>
+            </div>
+
+            {/* Right panel — auth form */}
+            <div className="flex-1 flex items-center justify-center bg-[#FBF9F5] px-5 sm:px-10 py-10 sm:py-12">
+                <div className="w-full max-w-sm">
+                    <div className="mb-8">
+                        <h2 className="ql-display text-3xl text-[#241F2E]">
+                            {isRegister ? "Create your account" : "Welcome back"}
+                        </h2>
+                        <p className="text-[#241F2E]/60 text-sm mt-2">
+                            {isRegister
+                                ? "Start writing on QuillSpace in under a minute."
+                                : "Log in to keep reading and writing."}
                         </p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-6 w-full">
-                        {/* Name field — only on register */}
+                    <div className="mb-6">
+                        <GoogleLogin
+                            onSuccess={handleGoogleSuccess}
+                            onError={() => toast.error("Google sign-in failed.")}
+                            theme="outline"
+                            shape="pill"
+                            size="large"
+                            text={isRegister ? "signup_with" : "signin_with"}
+                            logo_alignment="left"
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="flex-1 h-px bg-[#241F2E]/10" />
+                        <span className="ql-eyebrow text-[10px] text-[#241F2E]/40">OR</span>
+                        <div className="flex-1 h-px bg-[#241F2E]/10" />
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-5">
                         {isRegister && (
-                            <div className="flex flex-col">
-                                <label className="text-sm font-semibold text-gray-700 mb-2">Name</label>
+                            <div>
+                                <label className="ql-eyebrow block text-[10px] text-[#241F2E]/60 mb-2">
+                                    NAME
+                                </label>
                                 <input
                                     onChange={(e) => setName(e.target.value)}
                                     value={name}
                                     type="text"
-                                    placeholder="Your Full Name"
-                                    className="p-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/50 transition hover:shadow-md"
+                                    placeholder="Your full name"
                                     required
+                                    className="w-full px-4 py-3 rounded-xl border border-[#241F2E]/15 bg-white text-[#241F2E] placeholder:text-[#241F2E]/35 outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
                                 />
                             </div>
                         )}
 
-                        <div className="flex flex-col">
-                            <label className="text-sm font-semibold text-gray-700 mb-2">Email</label>
+                        <div>
+                            <label className="ql-eyebrow block text-[10px] text-[#241F2E]/60 mb-2">
+                                EMAIL
+                            </label>
                             <input
                                 onChange={(e) => setEmail(e.target.value)}
                                 value={email}
                                 type="email"
-                                placeholder="Your Email Id"
-                                className="p-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/50 transition hover:shadow-md"
+                                placeholder="you@example.com"
                                 required
+                                className="w-full px-4 py-3 rounded-xl border border-[#241F2E]/15 bg-white text-[#241F2E] placeholder:text-[#241F2E]/35 outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
                             />
                         </div>
 
-                        <div className="flex flex-col relative">
-                            <label className="text-sm font-semibold text-gray-700 mb-2">Password</label>
-                            <input
-                                onChange={(e) => setPassword(e.target.value)}
-                                value={password}
-                                type={showPassword ? "text" : "password"}
-                                placeholder="Your Password"
-                                className="p-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/50 transition hover:shadow-md pr-10"
-                                required
-                            />
-                            <div
-                                className="absolute right-3 top-[38px] cursor-pointer text-gray-500"
-                                onClick={() => setShowPassword(!showPassword)}
-                            >
-                                {showPassword ? <AiOutlineEyeInvisible size={20} /> : <AiOutlineEye size={20} />}
+                        <div>
+                            <label className="ql-eyebrow block text-[10px] text-[#241F2E]/60 mb-2">
+                                PASSWORD
+                            </label>
+                            <div className="relative">
+                                <input
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    value={password}
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="••••••••"
+                                    required
+                                    className="w-full px-4 py-3 pr-11 rounded-xl border border-[#241F2E]/15 bg-white text-[#241F2E] placeholder:text-[#241F2E]/35 outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#241F2E]/40 hover:text-[#241F2E]/70 cursor-pointer"
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                >
+                                    {showPassword ? <AiOutlineEyeInvisible size={19} /> : <AiOutlineEye size={19} />}
+                                </button>
                             </div>
                         </div>
 
                         <button
-                            className={`relative w-full py-3 font-medium bg-primary text-white rounded-md shadow-md cursor-pointer overflow-hidden group transition-all duration-200 transform ${
-                                loading ? "opacity-70 cursor-not-allowed" : "hover:bg-primary/90 hover:scale-[1.02]"
-                            }`}
                             type="submit"
                             disabled={loading}
+                            className={`w-full py-3.5 rounded-xl font-medium text-white bg-primary shadow-[0_8px_20px_-6px_rgba(80,68,229,0.55)] transition-all cursor-pointer ${
+                                loading ? "opacity-60 cursor-not-allowed" : "hover:bg-[#453adf] hover:-translate-y-[1px]"
+                            }`}
                         >
-                            <span className="relative z-10">
-                                {loading ? (isRegister ? "Registering..." : "Logging in...") : (isRegister ? "Register" : "Login")}
-                            </span>
-                            <span className="absolute inset-0 bg-white opacity-0 group-active:opacity-20 transition" />
+                            {loading
+                                ? (isRegister ? "Creating account…" : "Logging in…")
+                                : (isRegister ? "Create account" : "Log in")}
                         </button>
                     </form>
 
-                    {/* ✅ Toggle between login and register */}
-                    <p className="mt-4 text-sm text-gray-600">
-                        {isRegister ? "Already have an account?" : "Don't have an account?"}
+                    <p className="mt-6 text-center text-sm text-[#241F2E]/60">
+                        {isRegister ? "Already have an account?" : "New to QuillSpace?"}{" "}
                         <span
                             onClick={() => setIsRegister(!isRegister)}
-                            className="text-primary font-semibold cursor-pointer ml-1"
+                            className="text-primary font-semibold cursor-pointer hover:underline"
                         >
-                            {isRegister ? "Login" : "Register"}
+                            {isRegister ? "Log in" : "Create one"}
                         </span>
                     </p>
                 </div>

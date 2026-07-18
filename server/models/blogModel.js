@@ -25,6 +25,14 @@ const blogSchema = new mongoose.Schema(
       type: Boolean,
       required: true,
     },
+    likes: {
+      type: Number,
+      default: 0,
+    },
+    dislikes: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true },
 );

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { blog_data, blogCategories } from "../assets/assets";
+import { blogCategories } from "../assets/assets";
 import { motion } from "motion/react";
 import BlogCard from "../components/BlogCard";
 import { useAppContext } from "../context/AppContext";
@@ -19,24 +19,28 @@ const BlogList = () => {
     );
   };
 
+  const visibleBlogs = filteredBlogs().filter((blog) =>
+    menu === "All" ? true : blog.category === menu
+  );
+
   return (
     <div>
       {/* Category Tabs */}
-      <div className="flex justify-center gap-4 sm:gap-8 my-10 relative">
+      <div className="flex justify-center flex-wrap gap-2 sm:gap-3 my-12 relative">
         {blogCategories.map((item, index) => (
           <div key={item || index} className="relative">
             <button
               onClick={() => setMenu(item)}
-              className={`cursor-pointer text-gray-500 ${
-                menu === item && "text-white px-4 pt-0.5"
+              className={`relative cursor-pointer text-sm px-5 py-2 rounded-full transition-colors ${
+                menu === item ? "text-white" : "text-[#241F2E]/55 hover:text-[#241F2E]"
               }`}
             >
-              {item}
+              <span className="relative z-10">{item}</span>
               {menu === item && (
                 <motion.div
                   layoutId="underline"
                   transition={{ type: "spring", stiffness: 200, damping: 30 }}
-                  className="absolute left-0 right-0 top-0 h-7 -z-1 bg-primary rounded-full"
+                  className="absolute inset-0 bg-primary rounded-full"
                 />
               )}
             </button>
@@ -45,13 +49,20 @@ const BlogList = () => {
       </div>
 
       {/* Blog Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-8 mb-24 mx-8 sm:mx-16 xl:mx-40">
-        {filteredBlogs()
-          .filter((blog) => (menu === "All" ? true : blog.category === menu))
-          .map((blog, index) => (
-            <BlogCard key={blog.id || index} blog={blog} />
+      {visibleBlogs.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-24 mx-5 sm:mx-10 lg:mx-16 xl:mx-40">
+          {visibleBlogs.map((blog) => (
+            <BlogCard key={blog._id} blog={blog} />
           ))}
-      </div>
+        </div>
+      ) : (
+        <div className="text-center mb-24 mx-8">
+          <p className="text-[#241F2E]/60 font-medium">No stories here yet.</p>
+          <p className="text-[#241F2E]/40 text-sm mt-1">
+            {input ? "Try a different search term." : "Check back soon, or explore another category."}
+          </p>
+        </div>
+      )}
     </div>
   );
 };

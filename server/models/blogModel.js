@@ -24,6 +24,12 @@ const blogSchema = new mongoose.Schema(
     isPublished: {
       type: Boolean,
       required: true,
+      default: false,
+    },
+    author: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
     likes: {
       type: Number,

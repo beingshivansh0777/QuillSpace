@@ -17,6 +17,12 @@ const userSchema = new mongoose.Schema(
       maxlength: 160,
       default: "",
     },
+    bookmarks: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "blog",
+      },
+    ],
     email: {
       type: String,
       required: true,

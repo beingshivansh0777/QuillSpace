@@ -3,26 +3,39 @@ import {
   addBlog,
   addComment,
   deleteBlogById,
+  deleteOwnBlog,
   generateContent,
   getAllBlogs,
   getBlogById,
   getBlogComments,
+  getBookmarkedBlogs,
+  getBookmarkStatus,
+  getMyBlogs,
   togglePublish,
+  toggleBookmark,
+  updateBlog,
   voteBlog,
 } from "../contollers/blogController.js";
 import upload from "../middleware/multer.js";
 import auth from "../middleware/auth.js";
+import adminAuth from "../middleware/adminAuth.js";
 
 const blogRouter = express.Router();
 
 blogRouter.post("/add", upload.single("image"), auth, addBlog);
 blogRouter.get("/all", getAllBlogs);
-blogRouter.get("/:blogId", getBlogById);
-blogRouter.post("/delete", auth, deleteBlogById);
-blogRouter.post("/toggle-publish", auth, togglePublish);
+blogRouter.get("/mine", auth, getMyBlogs);
+blogRouter.get("/bookmarks", auth, getBookmarkedBlogs);
+blogRouter.get("/bookmark-status/:blogId", auth, getBookmarkStatus);
+blogRouter.get("/:blogId", getBlogById);                              // keep below the literal paths above
+blogRouter.post("/delete", adminAuth, deleteBlogById);                // admin — any post
+blogRouter.post("/delete-own", auth, deleteOwnBlog);                  // author — their own post, anytime
+blogRouter.post("/toggle-publish", adminAuth, togglePublish);
+blogRouter.patch("/update/:id", upload.single("image"), auth, updateBlog); // author — within 30 min
 blogRouter.post("/add-comment", auth, addComment);
 blogRouter.post("/comments", getBlogComments);
 blogRouter.post("/generate", auth, generateContent);
-blogRouter.post("/vote", voteBlog);   
+blogRouter.post("/vote", voteBlog);
+blogRouter.post("/bookmark", auth, toggleBookmark);
 
 export default blogRouter;

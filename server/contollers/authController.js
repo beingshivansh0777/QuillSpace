@@ -28,7 +28,7 @@ export const registerUser = async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const user = await User.create({ name, email, password: hashedPassword }); // role defaults to "user"
+        const user = await User.create({ name, email, password: hashedPassword });
 
         const token = generateToken(user);
         res.json({ success: true, token, message: "Registration successful!" });
@@ -62,7 +62,6 @@ export const loginUser = async (req, res) => {
 
         const token = generateToken(user);
 
-        // ✅ Send role so frontend knows where to redirect
         res.json({ success: true, token, role: user.role });
 
     } catch (error) {
@@ -98,7 +97,6 @@ export const googleAuth = async (req, res) => {
                     redirectToLogin: true,
                 });
             }
-            // Brand new user — create with no password, role defaults to "user"
             user = await User.create({ name, email, googleId });
         } else {
             // mode === "login"
@@ -108,8 +106,6 @@ export const googleAuth = async (req, res) => {
                     message: "User is not registered. Please register first.",
                 });
             }
-            // Existing account — link the googleId if it wasn't set yet
-            // (e.g. they originally registered with email/password).
             if (!user.googleId) {
                 user.googleId = googleId;
                 await user.save();
@@ -119,6 +115,23 @@ export const googleAuth = async (req, res) => {
         const token = generateToken(user);
         res.json({ success: true, token, role: user.role, message: "Signed in with Google!" });
 
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+// PUBLIC PROFILE — anyone can view a user's name, username, and bio
+// GET /api/auth/user/:username
+export const getPublicProfile = async (req, res) => {
+    try {
+        const { username } = req.params;
+
+        const user = await User.findOne({ username }).select("name username bio createdAt");
+        if (!user) {
+            return res.json({ success: false, message: "User not found." });
+        }
+
+        res.json({ success: true, user });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }

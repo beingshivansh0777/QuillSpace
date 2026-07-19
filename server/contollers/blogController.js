@@ -2,51 +2,50 @@ import fs from "fs";
 import imagekit from "../configs/imageKit.js";
 import Blog from "../models/blogModel.js";
 import Comment from "../models/commentModel.js";
-import main from "../configs/gemini.js";
 import User from "../models/userModel.js";
+import main from "../configs/gemini.js";
 
 export const addBlog = async (req, res) => {
   try {
-    const { title, subTitle, description, category, isPublished } = JSON.parse(
-      req.body.blog,
+    const { title, subTitle, description, category } = JSON.parse(
+      req.body.blog
     );
     const imageFile = req.file;
 
-    // Check if al fields are present !
     if (!title || !description || !category || !imageFile) {
       return res.json({ success: false, message: "Missing required field." });
     }
     const fileBuffer = fs.readFileSync(imageFile.path);
-    //Uplaoad Image to Imagekit
+
     const response = await imagekit.upload({
       file: fileBuffer,
       fileName: imageFile.originalname,
       folder: "/blogs",
     });
 
-    //Optimization through imagekit URL transformation
-
     const optimizedImageUrl = imagekit.url({
       path: response.filePath,
       transformation: [
-        { quality: "auto" }, //Auto compression
-        { format: "webp" }, //Convert to modern format
-        { width: "1280" }, //Width resizing
+        { quality: "auto" },
+        { format: "webp" },
+        { width: "1280" },
       ],
     });
 
     const image = optimizedImageUrl;
 
+    // Blogs now go live immediately on submission — no admin review step.
     await Blog.create({
       title,
       subTitle,
       description,
       category,
       image,
-      isPublished,
+      isPublished: true,
+      author: req.user.id,
     });
 
-    res.json({ success: true, message: "Blog added sucessfully" });
+    res.json({ success: true, message: "Blog published!" });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -54,7 +53,9 @@ export const addBlog = async (req, res) => {
 
 export const getAllBlogs = async (req, res) => {
   try {
-    const blogs = await Blog.find({ isPublished: true });
+    const blogs = await Blog.find({ isPublished: true })
+      .populate("author", "name username")
+      .sort({ createdAt: -1 });
     res.json({ success: true, blogs });
   } catch (error) {
     res.json({ success: false, message: error.message });
@@ -64,7 +65,7 @@ export const getAllBlogs = async (req, res) => {
 export const getBlogById = async (req, res) => {
   try {
     const { blogId } = req.params;
-    const blog = await Blog.findById(blogId);
+    const blog = await Blog.findById(blogId).populate("author", "name username");
     if (!blog) {
       return res.json({ success: false, message: "Blog Not Found!" });
     }
@@ -74,14 +75,21 @@ export const getBlogById = async (req, res) => {
   }
 };
 
+// Blogs written by the currently logged-in user (any status)
+export const getMyBlogs = async (req, res) => {
+  try {
+    const blogs = await Blog.find({ author: req.user.id }).sort({ createdAt: -1 });
+    res.json({ success: true, blogs });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
 export const deleteBlogById = async (req, res) => {
   try {
     const { id } = req.body;
     await Blog.findByIdAndDelete(id);
-
-    // Delete all comments associated with the blog!
     await Comment.deleteMany({ blog: id });
-
     res.json({ success: true, message: "Blog deleted successfully." });
   } catch (error) {
     res.json({ success: false, message: error.message });
@@ -102,18 +110,157 @@ export const togglePublish = async (req, res) => {
 
 export const addComment = async (req, res) => {
   try {
-    const { blog, content } = req.body; // name no longer comes from the client
+    const { blog, content } = req.body;
 
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.json({
-        success: false,
-        message: "Please login first..",
-      });
+      return res.json({ success: false, message: "User not found. Please login again." });
     }
 
     await Comment.create({ blog, name: user.name, content });
     res.json({ success: true, message: "Comment added for review" });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+export const getBlogComments = async (req, res) => {
+  try {
+    const { blogId } = req.body;
+    const comments = await Comment.find({ blog: blogId, isApproved: true }).sort({ createdAt: -1 });
+    res.json({ success: true, comments });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+export const generateContent = async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    const content = await main(prompt + 'Generate a blog content for this topic in simple text format');
+    res.json({ success: true, content });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+const EDIT_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
+
+// PATCH /api/blog/update/:id — author only, within 30 minutes of creation
+export const updateBlog = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const blog = await Blog.findById(id);
+
+    if (!blog) {
+      return res.json({ success: false, message: "Blog not found." });
+    }
+    if (blog.author.toString() !== req.user.id) {
+      return res.json({ success: false, message: "You can only edit your own posts." });
+    }
+
+    const age = Date.now() - new Date(blog.createdAt).getTime();
+    if (age > EDIT_WINDOW_MS) {
+      return res.json({ success: false, message: "The 30-minute edit window has passed." });
+    }
+
+    const { title, subTitle, description, category } = JSON.parse(req.body.blog);
+
+    blog.title = title ?? blog.title;
+    blog.subTitle = subTitle ?? blog.subTitle;
+    blog.description = description ?? blog.description;
+    blog.category = category ?? blog.category;
+
+    if (req.file) {
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const response = await imagekit.upload({
+        file: fileBuffer,
+        fileName: req.file.originalname,
+        folder: "/blogs",
+      });
+      blog.image = imagekit.url({
+        path: response.filePath,
+        transformation: [
+          { quality: "auto" },
+          { format: "webp" },
+          { width: "1280" },
+        ],
+      });
+    }
+
+    await blog.save();
+    res.json({ success: true, message: "Blog updated.", blog });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// POST /api/blog/delete-own — author can delete their own post anytime
+export const deleteOwnBlog = async (req, res) => {
+  try {
+    const { id } = req.body;
+    const blog = await Blog.findById(id);
+
+    if (!blog) {
+      return res.json({ success: false, message: "Blog not found." });
+    }
+    if (blog.author.toString() !== req.user.id) {
+      return res.json({ success: false, message: "You can only delete your own posts." });
+    }
+
+    await Blog.findByIdAndDelete(id);
+    await Comment.deleteMany({ blog: id });
+
+    res.json({ success: true, message: "Blog deleted." });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// POST /api/blog/bookmark — toggle a blog in the logged-in user's bookmarks
+export const toggleBookmark = async (req, res) => {
+  try {
+    const { blogId } = req.body;
+    const user = await User.findById(req.user.id);
+
+    const index = user.bookmarks.findIndex((b) => b.toString() === blogId);
+    let bookmarked;
+
+    if (index === -1) {
+      user.bookmarks.push(blogId);
+      bookmarked = true;
+    } else {
+      user.bookmarks.splice(index, 1);
+      bookmarked = false;
+    }
+
+    await user.save();
+    res.json({ success: true, bookmarked });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/blog/bookmark-status/:blogId
+export const getBookmarkStatus = async (req, res) => {
+  try {
+    const { blogId } = req.params;
+    const user = await User.findById(req.user.id);
+    const bookmarked = user.bookmarks.some((b) => b.toString() === blogId);
+    res.json({ success: true, bookmarked });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/blog/bookmarks — full list of the logged-in user's saved blogs
+export const getBookmarkedBlogs = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).populate({
+      path: "bookmarks",
+      populate: { path: "author", select: "name username" },
+    });
+    res.json({ success: true, blogs: user.bookmarks });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -129,12 +276,8 @@ export const voteBlog = async (req, res) => {
     }
 
     const update = {};
-
-    // Remove the old vote's count, if there was one
     if (previousType === "like") update.likes = (update.likes || 0) - 1;
     if (previousType === "dislike") update.dislikes = (update.dislikes || 0) - 1;
-
-    // Add the new vote's count, if it isn't "none"
     if (type === "like") update.likes = (update.likes || 0) + 1;
     if (type === "dislike") update.dislikes = (update.dislikes || 0) + 1;
 
@@ -153,32 +296,6 @@ export const voteBlog = async (req, res) => {
       likes: blog.likes,
       dislikes: blog.dislikes,
     });
-  } catch (error) {
-    res.json({ success: false, message: error.message });
-  }
-};
-
-
-export const getBlogComments = async (req, res) => {
-  try {
-    const { blogId } = req.body;
-    const comments = await Comment.find({
-      blog: blogId,
-      isApproved: true,
-    }).sort({ createdAt: -1 });
-    res.json({ success: true, comments });
-  } catch (error) {
-    res.json({ success: false, message: error.message });
-  }
-};
-
-export const generateContent = async (req, res) => {
-  try {
-    const { prompt } = req.body;
-    const content = await main(
-      prompt + "Generate a blog content for this topic in simple text format",
-    );
-    res.json({ success: true, content });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }

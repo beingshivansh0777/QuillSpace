@@ -3,12 +3,11 @@ import Logo from "../assets/logo.jpeg";
 import { assets } from "../assets/assets";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../context/AppContext";
-import EditProfileModal from "./EditProfileModal";
+import { HiOutlinePencilAlt } from "react-icons/hi";
 
 const Navbar = () => {
   const { navigate, token, user, logout } = useAppContext();
   const [showMenu, setShowMenu] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
 
   const initial = user?.name ? user.name.charAt(0).toUpperCase() : "?";
 
@@ -21,9 +20,18 @@ const Navbar = () => {
         className="w-32 sm:w-44 cursor-pointer"
       />
 
-      {/* Logged in: show avatar + dropdown. Logged out: show Login button. */}
+      {/* Logged in: show Write link + avatar dropdown. Logged out: show Login button. */}
       {token && user ? (
-        <div className="relative">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate("/write")}
+            className="flex items-center gap-2 text-sm font-medium text-primary border border-primary/30 hover:bg-primary/5 rounded-full px-4 py-2 transition-colors cursor-pointer"
+          >
+            <HiOutlinePencilAlt size={16} />
+            <span className="hidden sm:inline">Write</span>
+          </button>
+
+          <div className="relative">
           <button
             onClick={() => setShowMenu((v) => !v)}
             className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-semibold cursor-pointer"
@@ -48,11 +56,11 @@ const Navbar = () => {
               <button
                 onClick={() => {
                   setShowMenu(false);
-                  setShowEditModal(true);
+                  navigate("/profile");
                 }}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
               >
-                Edit Profile
+                My Profile
               </button>
 
               {user.role === "admin" && (
@@ -78,6 +86,7 @@ const Navbar = () => {
               </button>
             </div>
           )}
+          </div>
         </div>
       ) : (
         <button
@@ -89,7 +98,6 @@ const Navbar = () => {
         </button>
       )}
 
-      {showEditModal && <EditProfileModal onClose={() => setShowEditModal(false)} />}
     </div>
   );
 };

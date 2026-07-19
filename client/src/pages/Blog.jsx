@@ -8,6 +8,7 @@ import Loader from "../components/Loader";
 import { useAppContext } from "../context/AppContext";
 import toast from "react-hot-toast";
 import { FaWhatsapp, FaFacebook, FaInstagram, FaLink, FaThumbsUp, FaThumbsDown } from "react-icons/fa";
+import { FaRegBookmark, FaBookmark } from "react-icons/fa6";
 
 const Blog = () => {
   const { id } = useParams();
@@ -22,6 +23,7 @@ const Blog = () => {
   const [likes, setLikes] = useState(0);
   const [dislikes, setDislikes] = useState(0);
   const [myVote, setMyVote] = useState("none");
+  const [bookmarked, setBookmarked] = useState(false);
 
   const fetchBlogData = async () => {
     try {
@@ -115,7 +117,33 @@ const Blog = () => {
 
     const storedVote = localStorage.getItem(`vote_${id}`);
     if (storedVote) setMyVote(storedVote);
-  }, []);
+
+    if (token) {
+      axios.get(`/api/blog/bookmark-status/${id}`).then(({ data }) => {
+        if (data.success) setBookmarked(data.bookmarked);
+      }).catch(() => {});
+    }
+  }, [token]);
+
+  const toggleBookmark = async () => {
+    if (!token) {
+      toast.error("Please login to save posts.");
+      return;
+    }
+    setBookmarked((prev) => !prev); // optimistic
+    try {
+      const { data } = await axios.post("/api/blog/bookmark", { blogId: id });
+      if (data.success) {
+        setBookmarked(data.bookmarked);
+      } else {
+        toast.error(data.message);
+        setBookmarked((prev) => !prev); // revert
+      }
+    } catch (error) {
+      toast.error(error.message);
+      setBookmarked((prev) => !prev);
+    }
+  };
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
 
@@ -164,6 +192,15 @@ const Blog = () => {
 
       <Navbar />
 
+      {/* Bookmark — floating on the right edge for laptop/desktop */}
+      <button
+        onClick={toggleBookmark}
+        aria-label={bookmarked ? "Remove bookmark" : "Save this post"}
+        className="hidden lg:flex fixed right-8 top-1/2 -translate-y-1/2 z-40 w-12 h-12 items-center justify-center rounded-full bg-white shadow-lg border border-[#241F2E]/10 hover:scale-105 transition-all cursor-pointer"
+      >
+        {bookmarked ? <FaBookmark className="text-primary" size={18} /> : <FaRegBookmark className="text-[#241F2E]/60" size={18} />}
+      </button>
+
       <div className="text-center mt-16 px-5 ql-fade-in">
         <p className="ql-blog-eyebrow text-[11px] text-primary/70 mb-4">
           PUBLISHED {Moment(data.createdAt).format("MMMM D, YYYY").toUpperCase()}
@@ -179,6 +216,22 @@ const Blog = () => {
         <span className="inline-block mt-6 py-1 px-4 rounded-full border border-primary/25 bg-primary/5 text-xs font-medium text-primary">
           {data.category}
         </span>
+
+        {data.author && (
+          <p className="mt-4 text-sm text-[#241F2E]/50">
+            Written by{" "}
+            {data.author.username ? (
+              <Link
+                to={`/user/${data.author.username}`}
+                className="text-primary font-medium hover:underline"
+              >
+                {data.author.name}
+              </Link>
+            ) : (
+              <span className="text-[#241F2E]/70 font-medium">{data.author.name}</span>
+            )}
+          </p>
+        )}
       </div>
 
       <div className="mx-5 max-w-4xl md:mx-auto my-12">
@@ -215,6 +268,14 @@ const Blog = () => {
             }`}
           >
             <FaThumbsDown size={14} /> {dislikes}
+          </button>
+
+          <button
+            onClick={toggleBookmark}
+            aria-label={bookmarked ? "Remove bookmark" : "Save this post"}
+            className="lg:hidden flex items-center gap-2 px-5 py-2.5 rounded-full border text-sm font-medium border-[#241F2E]/15 text-[#241F2E]/60 hover:border-primary/40 transition-all cursor-pointer ml-auto"
+          >
+            {bookmarked ? <FaBookmark className="text-primary" size={14} /> : <FaRegBookmark size={14} />}
           </button>
         </div>
 

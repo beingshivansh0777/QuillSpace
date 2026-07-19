@@ -108,27 +108,78 @@ export const togglePublish = async (req, res) => {
   }
 };
 
+// POST /api/blog/add-comment
+// body: { blog, content, parent? } — parent is the comment id being replied to (optional)
 export const addComment = async (req, res) => {
   try {
-    const { blog, content } = req.body;
+    const { blog, content, parent } = req.body;
 
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.json({ success: false, message: "User not found. Please login again." });
     }
 
-    await Comment.create({ blog, name: user.name, content });
-    res.json({ success: true, message: "Comment added for review" });
+    const comment = await Comment.create({
+      blog,
+      user: req.user.id,
+      name: user.name,
+      content,
+      parent: parent || null,
+    });
+
+    const populated = await comment.populate("user", "name username avatar");
+    res.json({ success: true, message: "Comment posted!", comment: populated });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
 };
 
+// POST /api/blog/comments — all comments for a blog, live (no approval gate),
+// organized into a two-level tree: top-level comments each with a `replies` array.
 export const getBlogComments = async (req, res) => {
   try {
     const { blogId } = req.body;
-    const comments = await Comment.find({ blog: blogId, isApproved: true }).sort({ createdAt: -1 });
-    res.json({ success: true, comments });
+    const all = await Comment.find({ blog: blogId })
+      .populate("user", "name username avatar")
+      .sort({ createdAt: -1 });
+
+    const topLevel = all.filter((c) => !c.parent);
+    const replies = all.filter((c) => c.parent);
+
+    const tree = topLevel.map((c) => ({
+      ...c.toObject(),
+      replies: replies
+        .filter((r) => r.parent.toString() === c._id.toString())
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)),
+    }));
+
+    res.json({ success: true, comments: tree });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// POST /api/blog/comment-like — toggle like on a comment
+export const toggleCommentLike = async (req, res) => {
+  try {
+    const { commentId } = req.body;
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.json({ success: false, message: "Comment not found." });
+    }
+
+    const index = comment.likes.findIndex((u) => u.toString() === req.user.id);
+    let liked;
+    if (index === -1) {
+      comment.likes.push(req.user.id);
+      liked = true;
+    } else {
+      comment.likes.splice(index, 1);
+      liked = false;
+    }
+
+    await comment.save();
+    res.json({ success: true, liked, likeCount: comment.likes.length });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }

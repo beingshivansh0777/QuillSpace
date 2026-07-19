@@ -18,6 +18,7 @@ const MyProfile = () => {
   const [savedBlogs, setSavedBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showPhotoZoom, setShowPhotoZoom] = useState(false);
 
   const fetchMyPosts = async () => {
     try {
@@ -92,8 +93,17 @@ const MyProfile = () => {
       <div className="max-w-3xl mx-auto px-5 py-12">
         {/* Profile header */}
         <div className="flex items-center gap-4 mb-10">
-          <div className="w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-2xl font-semibold flex-shrink-0">
-            {initial}
+          <div
+            onClick={() => user?.avatar && setShowPhotoZoom(true)}
+            className={`w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-2xl font-semibold flex-shrink-0 overflow-hidden ${
+              user?.avatar ? "cursor-pointer hover:opacity-90 transition-opacity" : ""
+            }`}
+          >
+            {user?.avatar ? (
+              <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+            ) : (
+              initial
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-semibold text-[#241F2E] truncate">{user?.name}</h1>
@@ -223,6 +233,27 @@ const MyProfile = () => {
       <Footer />
 
       {showEditModal && <EditProfileModal onClose={() => setShowEditModal(false)} />}
+
+      {showPhotoZoom && user?.avatar && (
+        <div
+          onClick={() => setShowPhotoZoom(false)}
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] px-4 cursor-zoom-out"
+        >
+          <button
+            onClick={() => setShowPhotoZoom(false)}
+            aria-label="Close"
+            className="absolute top-5 right-5 text-white/80 hover:text-white text-3xl leading-none cursor-pointer"
+          >
+            ×
+          </button>
+          <img
+            src={user.avatar}
+            alt=""
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-[90vw] max-h-[85vh] rounded-2xl object-contain cursor-default"
+          />
+        </div>
+      )}
     </div>
   );
 };

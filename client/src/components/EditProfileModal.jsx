@@ -1,19 +1,28 @@
 import React, { useState } from "react";
 import { useAppContext } from "../context/AppContext";
 import toast from "react-hot-toast";
+import { HiOutlineCamera } from "react-icons/hi";
 
 const EditProfileModal = ({ onClose }) => {
     const { axios, user, setUser } = useAppContext();
 
     const [username, setUsername] = useState(user?.username || "");
     const [bio, setBio] = useState(user?.bio || "");
+    const [avatarFile, setAvatarFile] = useState(null);
     const [saving, setSaving] = useState(false);
+
+    const initial = user?.name?.charAt(0).toUpperCase() || "?";
 
     const handleSave = async (e) => {
         e.preventDefault();
         setSaving(true);
         try {
-            const { data } = await axios.patch("/api/auth/update-profile", { username, bio });
+            const formData = new FormData();
+            formData.append("username", username);
+            formData.append("bio", bio);
+            if (avatarFile) formData.append("avatar", avatarFile);
+
+            const { data } = await axios.patch("/api/auth/update-profile", formData);
             if (data.success) {
                 setUser(data.user);
                 toast.success("Profile updated.");
@@ -43,6 +52,38 @@ const EditProfileModal = ({ onClose }) => {
                 </p>
 
                 <form onSubmit={handleSave} className="space-y-4">
+                    <div className="flex justify-center">
+                        <label htmlFor="avatar" className="cursor-pointer relative block w-20 h-20">
+                            {avatarFile ? (
+                                <img
+                                    src={URL.createObjectURL(avatarFile)}
+                                    alt=""
+                                    className="w-20 h-20 rounded-full object-cover"
+                                />
+                            ) : user?.avatar ? (
+                                <img
+                                    src={user.avatar}
+                                    alt=""
+                                    className="w-20 h-20 rounded-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-20 h-20 rounded-full bg-primary text-white flex items-center justify-center text-2xl font-semibold">
+                                    {initial}
+                                </div>
+                            )}
+                            <span className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center shadow-md border-2 border-white">
+                                <HiOutlineCamera size={15} />
+                            </span>
+                            <input
+                                id="avatar"
+                                type="file"
+                                accept="image/*"
+                                hidden
+                                onChange={(e) => setAvatarFile(e.target.files[0])}
+                            />
+                        </label>
+                    </div>
+
                     <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                             Username

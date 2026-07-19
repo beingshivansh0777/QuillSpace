@@ -9,12 +9,16 @@ const userSchema = new mongoose.Schema(
     username: {
       type: String,
       unique: true,
-      sparse: true, // allows multiple users with no username set yet
+      sparse: true,
       trim: true,
     },
     bio: {
       type: String,
       maxlength: 160,
+      default: "",
+    },
+    avatar: {
+      type: String,
       default: "",
     },
     bookmarks: [
@@ -39,11 +43,11 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
     },
-    role:
-     { type: String, 
+    role: {
+      type: String,
       enum: ["user", "admin"],
-       default: "user"
-       },
+      default: "user",
+    },
   },
   { timestamps: true },
 );

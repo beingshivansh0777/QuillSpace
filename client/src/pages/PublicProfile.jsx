@@ -51,8 +51,12 @@ const PublicProfile = () => {
     <div className="min-h-screen bg-[#FBF9F5]">
       <Navbar />
       <div className="max-w-lg mx-auto mt-16 px-5 text-center">
-        <div className="w-20 h-20 rounded-full bg-primary text-white flex items-center justify-center text-3xl font-semibold mx-auto mb-5">
-          {initial}
+        <div className="w-20 h-20 rounded-full bg-primary text-white flex items-center justify-center text-3xl font-semibold mx-auto mb-5 overflow-hidden">
+          {profile.avatar ? (
+            <img src={profile.avatar} alt="" className="w-full h-full object-cover" />
+          ) : (
+            initial
+          )}
         </div>
         <h1 className="text-2xl font-semibold text-[#241F2E]">{profile.name}</h1>
         <p className="text-primary text-sm mt-1">@{profile.username}</p>

@@ -37,18 +37,19 @@ export const getAllBlogsAdmin = async (req, res) => {
     }
 };
 
+// Comments are live the moment they're posted — this just lists everything
+// for moderation. The only action available now is Delete.
 export const getAllComments = async (req, res) => {
     try {
         const comments = await Comment.find({})
-            .populate("blog")
+            .populate("blog", "title")
+            .populate("user", "name username")
             .sort({ createdAt: -1 });
         res.json({ success: true, comments });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
 };
-
-
 
 export const getDashboard = async (req, res) => {
     try {
@@ -63,21 +64,14 @@ export const getDashboard = async (req, res) => {
     }
 };
 
+// Deleting a comment also removes any replies to it, so moderation doesn't
+// leave orphaned replies pointing at a deleted parent.
 export const deleteCommentbyId = async (req, res) => {
     try {
         const { id } = req.body;
         await Comment.findByIdAndDelete(id);
+        await Comment.deleteMany({ parent: id });
         res.json({ success: true, message: "Comment deleted successfully." });
-    } catch (error) {
-        res.json({ success: false, message: error.message });
-    }
-};
-
-export const approveCommentbyId = async (req, res) => {
-    try {
-        const { id } = req.body;
-        await Comment.findByIdAndUpdate(id, { isApproved: true });
-        res.json({ success: true, message: "Comment approved!" });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }

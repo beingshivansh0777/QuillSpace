@@ -4,10 +4,12 @@ import { assets } from "../assets/assets";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../context/AppContext";
 import { HiOutlinePencilAlt } from "react-icons/hi";
+import ResetPasswordModal from "./ResetPasswordModal";
 
 const Navbar = () => {
   const { navigate, token, user, logout } = useAppContext();
   const [showMenu, setShowMenu] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
 
   const initial = user?.name ? user.name.charAt(0).toUpperCase() : "?";
 
@@ -34,9 +36,13 @@ const Navbar = () => {
           <div className="relative">
           <button
             onClick={() => setShowMenu((v) => !v)}
-            className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-semibold cursor-pointer"
+            className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-semibold cursor-pointer overflow-hidden"
           >
-            {initial}
+            {user.avatar ? (
+              <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+            ) : (
+              initial
+            )}
           </button>
 
           {showMenu && (
@@ -61,6 +67,16 @@ const Navbar = () => {
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
               >
                 My Profile
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowResetModal(true);
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+              >
+                Reset Password
               </button>
 
               {user.role === "admin" && (
@@ -98,6 +114,7 @@ const Navbar = () => {
         </button>
       )}
 
+      {showResetModal && <ResetPasswordModal onClose={() => setShowResetModal(false)} />}
     </div>
   );
 };

@@ -7,18 +7,31 @@ const commentSchema = new mongoose.Schema(
       ref: "blog",
       required: true,
     },
-    name: {
-      type: String,
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       required: true,
+    },
+    name: {
+      // kept for backward compatibility with old comments written before
+      // authentication was required; new comments are read via `user` populate.
+      type: String,
     },
     content: {
       type: String,
       required: true,
     },
-    isApproved: {
-      type: Boolean,
-      default: false,
+    parent: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Comment",
+      default: null,
     },
+    likes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   { timestamps: true },
 );

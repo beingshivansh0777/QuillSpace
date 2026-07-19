@@ -1,7 +1,9 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import fs from "fs";
 import { OAuth2Client } from "google-auth-library";
 import User from "../models/userModel.js";
+import imagekit from "../configs/imageKit.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -57,7 +59,7 @@ export const loginUser = async (req, res) => {
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            return res.json({ success: false, message: "Invalid Credentials." });
+            return res.json({ success: false, message: "Incorrect password." });
         }
 
         const token = generateToken(user);
@@ -126,7 +128,7 @@ export const getPublicProfile = async (req, res) => {
     try {
         const { username } = req.params;
 
-        const user = await User.findOne({ username }).select("name username bio createdAt");
+        const user = await User.findOne({ username }).select("name username bio avatar createdAt");
         if (!user) {
             return res.json({ success: false, message: "User not found." });
         }
@@ -140,18 +142,54 @@ export const getPublicProfile = async (req, res) => {
 // GET ME
 export const getMe = async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select("-password");
+        const user = await User.findById(req.user.id);
         if (!user) {
             return res.json({ success: false, message: "User not found." });
         }
-        res.json({ success: true, user });
+
+        const { password, ...safeUser } = user.toObject();
+        res.json({ success: true, user: { ...safeUser, hasPassword: !!password } });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
 };
 
-// UPDATE PROFILE — username + bio
-// PATCH /api/auth/update-profile
+// PATCH /api/auth/change-password
+// body: { currentPassword?, newPassword }
+// currentPassword is required only if the account already has a password set —
+// Google-only accounts can set their first password without one.
+export const changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+
+        if (!newPassword || newPassword.length < 6) {
+            return res.json({ success: false, message: "New password must be at least 6 characters." });
+        }
+
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.json({ success: false, message: "User not found." });
+        }
+
+        if (user.password) {
+            if (!currentPassword) {
+                return res.json({ success: false, message: "Please enter your current password." });
+            }
+            const isMatch = await bcrypt.compare(currentPassword, user.password);
+            if (!isMatch) {
+                return res.json({ success: false, message: "Current password is incorrect." });
+            }
+        }
+
+        user.password = await bcrypt.hash(newPassword, 10);
+        await user.save();
+
+        res.json({ success: true, message: "Password updated successfully." });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+// PATCH /api/auth/update-profile  (multipart/form-data)
 export const updateProfile = async (req, res) => {
     try {
         const { username, bio } = req.body;
@@ -179,6 +217,23 @@ export const updateProfile = async (req, res) => {
         const updates = {};
         if (username !== undefined) updates.username = username.trim();
         if (bio !== undefined) updates.bio = bio;
+
+        if (req.file) {
+            const fileBuffer = fs.readFileSync(req.file.path);
+            const response = await imagekit.upload({
+                file: fileBuffer,
+                fileName: req.file.originalname,
+                folder: "/avatars",
+            });
+            updates.avatar = imagekit.url({
+                path: response.filePath,
+                transformation: [
+                    { quality: "auto" },
+                    { format: "webp" },
+                    { height: "300", width: "300", focus: "auto" },
+                ],
+            });
+        }
 
         const user = await User.findByIdAndUpdate(req.user.id, updates, {
             new: true,

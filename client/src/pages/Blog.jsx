@@ -8,17 +8,20 @@ import Loader from "../components/Loader";
 import { useAppContext } from "../context/AppContext";
 import toast from "react-hot-toast";
 import { FaWhatsapp, FaFacebook, FaInstagram, FaLink, FaThumbsUp, FaThumbsDown } from "react-icons/fa";
-import { FaRegBookmark, FaBookmark } from "react-icons/fa6";
+import { FaRegBookmark, FaBookmark, FaRegHeart, FaHeart } from "react-icons/fa6";
 
 const Blog = () => {
   const { id } = useParams();
 
-  const { axios, token } = useAppContext();
+  const { axios, token, user } = useAppContext();
 
   const [data, setData] = useState(null);
   const [comments, setComments] = useState([]);
   const [content, setContent] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null); // comment id, or null
+  const [replyContent, setReplyContent] = useState("");
+  const [submittingReply, setSubmittingReply] = useState(false);
 
   const [likes, setLikes] = useState(0);
   const [dislikes, setDislikes] = useState(0);
@@ -70,6 +73,7 @@ const Blog = () => {
       if (data.success) {
         toast.success(data.message);
         setContent("");
+        setComments((prev) => [{ ...data.comment, replies: [] }, ...prev]);
       } else {
         toast.error(data.message);
       }
@@ -77,6 +81,76 @@ const Blog = () => {
       toast.error(error.message);
     } finally {
       setSubmittingComment(false);
+    }
+  };
+
+  const addReply = async (parentId) => {
+    if (!token) {
+      toast.error("Please login to reply.");
+      return;
+    }
+    if (!replyContent.trim()) return;
+
+    setSubmittingReply(true);
+    try {
+      const { data } = await axios.post("/api/blog/add-comment", {
+        blog: id,
+        content: replyContent,
+        parent: parentId,
+      });
+      if (data.success) {
+        setComments((prev) =>
+          prev.map((c) =>
+            c._id === parentId
+              ? { ...c, replies: [...c.replies, data.comment] }
+              : c
+          )
+        );
+        setReplyContent("");
+        setReplyingTo(null);
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setSubmittingReply(false);
+    }
+  };
+
+  const toggleCommentLike = async (commentId, isReply, parentId) => {
+    if (!token) {
+      toast.error("Please login to like comments.");
+      return;
+    }
+    try {
+      const { data } = await axios.post("/api/blog/comment-like", { commentId });
+      if (!data.success) {
+        toast.error(data.message);
+        return;
+      }
+
+      const updateLikes = (c) =>
+        c._id === commentId
+          ? {
+              ...c,
+              likes: data.liked
+                ? [...(c.likes || []), user?._id]
+                : (c.likes || []).filter((u) => u !== user?._id),
+            }
+          : c;
+
+      setComments((prev) =>
+        isReply
+          ? prev.map((c) =>
+              c._id === parentId
+                ? { ...c, replies: c.replies.map(updateLikes) }
+                : c
+            )
+          : prev.map(updateLikes)
+      );
+    } catch (error) {
+      toast.error(error.message);
     }
   };
 
@@ -285,25 +359,110 @@ const Blog = () => {
             {comments.length} {comments.length === 1 ? "COMMENT" : "COMMENTS"}
           </p>
           <div className="flex flex-col gap-3">
-            {comments.map((item, index) => (
-              <div
-                key={index}
-                className="bg-white border border-[#241F2E]/8 rounded-xl p-4"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold">
-                      {item.name?.charAt(0).toUpperCase() || "?"}
+            {comments.map((item) => {
+              const isLiked = (item.likes || []).includes(user?._id);
+              return (
+                <div key={item._id} className="bg-white border border-[#241F2E]/8 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold overflow-hidden">
+                        {item.user?.avatar ? (
+                          <img src={item.user.avatar} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          (item.user?.name || item.name)?.charAt(0).toUpperCase() || "?"
+                        )}
+                      </div>
+                      <p className="font-medium text-sm text-[#241F2E]">
+                        {item.user?.name || item.name}
+                      </p>
                     </div>
-                    <p className="font-medium text-sm text-[#241F2E]">{item.name}</p>
+                    <span className="text-xs text-[#241F2E]/35">
+                      {Moment(item.createdAt).fromNow()}
+                    </span>
                   </div>
-                  <span className="text-xs text-[#241F2E]/35">
-                    {Moment(item.createdAt).fromNow()}
-                  </span>
+                  <p className="text-sm text-[#241F2E]/70 ml-9.5">{item.content}</p>
+
+                  <div className="flex items-center gap-4 ml-9.5 mt-2">
+                    <button
+                      onClick={() => toggleCommentLike(item._id, false, null)}
+                      className="flex items-center gap-1.5 text-xs text-[#241F2E]/50 hover:text-primary transition-colors cursor-pointer"
+                    >
+                      {isLiked ? <FaHeart className="text-primary" size={12} /> : <FaRegHeart size={12} />}
+                      {item.likes?.length || 0}
+                    </button>
+                    <button
+                      onClick={() => setReplyingTo(replyingTo === item._id ? null : item._id)}
+                      className="text-xs text-[#241F2E]/50 hover:text-primary transition-colors cursor-pointer"
+                    >
+                      Reply
+                    </button>
+                  </div>
+
+                  {replyingTo === item._id && (
+                    <div className="ml-9.5 mt-3 flex flex-col gap-2">
+                      <textarea
+                        value={replyContent}
+                        onChange={(e) => setReplyContent(e.target.value)}
+                        placeholder={`Reply to ${item.user?.name || item.name}…`}
+                        className="w-full p-2.5 rounded-lg border border-[#241F2E]/15 bg-[#FBF9F5] outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all h-20 text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => addReply(item._id)}
+                          disabled={submittingReply}
+                          className="text-xs font-medium text-white bg-primary rounded-full px-4 py-1.5 hover:bg-[#453adf] transition-colors cursor-pointer disabled:opacity-60"
+                        >
+                          {submittingReply ? "Posting…" : "Post reply"}
+                        </button>
+                        <button
+                          onClick={() => { setReplyingTo(null); setReplyContent(""); }}
+                          className="text-xs text-[#241F2E]/50 hover:text-[#241F2E] transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {item.replies?.length > 0 && (
+                    <div className="ml-9.5 mt-4 flex flex-col gap-3 border-l-2 border-[#241F2E]/8 pl-4">
+                      {item.replies.map((reply) => {
+                        const replyLiked = (reply.likes || []).includes(user?._id);
+                        return (
+                          <div key={reply._id}>
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-semibold overflow-hidden">
+                                  {reply.user?.avatar ? (
+                                    <img src={reply.user.avatar} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    (reply.user?.name || reply.name)?.charAt(0).toUpperCase() || "?"
+                                  )}
+                                </div>
+                                <p className="font-medium text-xs text-[#241F2E]">
+                                  {reply.user?.name || reply.name}
+                                </p>
+                              </div>
+                              <span className="text-xs text-[#241F2E]/35">
+                                {Moment(reply.createdAt).fromNow()}
+                              </span>
+                            </div>
+                            <p className="text-sm text-[#241F2E]/70 ml-8">{reply.content}</p>
+                            <button
+                              onClick={() => toggleCommentLike(reply._id, true, item._id)}
+                              className="flex items-center gap-1.5 text-xs text-[#241F2E]/50 hover:text-primary transition-colors cursor-pointer ml-8 mt-1.5"
+                            >
+                              {replyLiked ? <FaHeart className="text-primary" size={11} /> : <FaRegHeart size={11} />}
+                              {reply.likes?.length || 0}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                <p className="text-sm text-[#241F2E]/70 ml-9.5">{item.content}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

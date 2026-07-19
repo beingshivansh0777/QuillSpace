@@ -13,6 +13,7 @@ import {
   getMyBlogs,
   togglePublish,
   toggleBookmark,
+  toggleCommentLike,
   updateBlog,
   voteBlog,
 } from "../contollers/blogController.js";
@@ -37,5 +38,6 @@ blogRouter.post("/comments", getBlogComments);
 blogRouter.post("/generate", auth, generateContent);
 blogRouter.post("/vote", voteBlog);
 blogRouter.post("/bookmark", auth, toggleBookmark);
+blogRouter.post("/comment-like", auth, toggleCommentLike);
 
 export default blogRouter;

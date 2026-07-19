@@ -236,6 +236,15 @@ const Login = () => {
                         </button>
                     </form>
 
+                    {!isRegister && (
+                        <Link
+                            to="/forgot-password"
+                            className="mt-3 text-sm text-[#241F2E]/50 hover:text-primary transition-colors"
+                        >
+                            Forgot password?
+                        </Link>
+                    )}
+
                     <p className="mt-6 text-center text-sm text-[#241F2E]/60">
                         {isRegister ? "Already have an account?" : "New to QuillSpace?"}{" "}
                         <span

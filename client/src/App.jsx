@@ -7,6 +7,8 @@ import WriteBlog from './pages/WriteBlog.jsx'
 import EditBlog from './pages/EditBlog.jsx'
 import MyProfile from './pages/MyProfile.jsx'
 import PublicProfile from './pages/PublicProfile.jsx'
+import ForgotPassword from './pages/ForgetPassword.jsx'
+import ResetPassword from './pages/ResetPassword.jsx'
 import Layout from './pages/admin/Layout.jsx'
 import Dashboard from './pages/admin/Dashboard.jsx'
 import ListBlog from './pages/admin/ListBlog.jsx'
@@ -29,6 +31,8 @@ const App = () => {
         <Route path="/" element={<Home />} />
         <Route path="/blog/:id" element={<Blog/>} />
         <Route path="/login" element={<Login/>} />
+        <Route path="/forgot-password" element={<ForgotPassword/>} />
+        <Route path="/reset-password/:token" element={<ResetPassword/>} />
         <Route path="/write" element={<WriteBlog/>} />
         <Route path="/edit/:id" element={<EditBlog/>} />
         <Route path="/profile" element={<MyProfile/>} />

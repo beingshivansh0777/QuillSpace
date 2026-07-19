@@ -1,9 +1,11 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import fs from "fs";
 import { OAuth2Client } from "google-auth-library";
 import User from "../models/userModel.js";
 import imagekit from "../configs/imageKit.js";
+import resend from "../configs/resend.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -154,7 +156,89 @@ export const getMe = async (req, res) => {
     }
 };
 
-// PATCH /api/auth/change-password
+// POST /api/auth/forgot-password
+// body: { email }
+// Always responds with the same generic message, whether or not the email
+// exists — this prevents attackers from using this endpoint to discover
+// which emails are registered.
+export const forgotPassword = async (req, res) => {
+    const genericMessage = "If an account exists for that email, a reset link has been sent.";
+
+    try {
+        const { email } = req.body;
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            return res.json({ success: true, message: genericMessage });
+        }
+
+        // Raw token goes in the email link; only the hash is stored in the DB —
+        // same principle as passwords, so a DB leak alone can't be used to reset accounts.
+        const rawToken = crypto.randomBytes(32).toString("hex");
+        const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+        user.resetPasswordToken = hashedToken;
+        user.resetPasswordExpires = Date.now() + 30 * 60 * 1000; // 30 minutes
+        await user.save();
+
+        const resetUrl = `${process.env.CLIENT_URL}/reset-password/${rawToken}`;
+
+        await resend.emails.send({
+            from: "QuillSpace <onboarding@resend.dev>",
+            to: user.email,
+            subject: "Reset your QuillSpace password",
+            html: `
+                <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+                    <h2 style="color: #241F2E;">Reset your password</h2>
+                    <p style="color: #444;">We received a request to reset the password for your QuillSpace account.</p>
+                    <p style="margin: 24px 0;">
+                        <a href="${resetUrl}" style="background: #5044E5; color: white; padding: 12px 28px; border-radius: 999px; text-decoration: none; font-weight: 600;">
+                            Reset Password
+                        </a>
+                    </p>
+                    <p style="color: #888; font-size: 13px;">This link expires in 30 minutes. If you didn't request this, you can safely ignore this email.</p>
+                </div>
+            `,
+        });
+
+        res.json({ success: true, message: genericMessage });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+// POST /api/auth/reset-password/:token
+// body: { newPassword }
+export const resetPassword = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const { newPassword } = req.body;
+
+        if (!newPassword || newPassword.length < 6) {
+            return res.json({ success: false, message: "Password must be at least 6 characters." });
+        }
+
+        const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+        const user = await User.findOne({
+            resetPasswordToken: hashedToken,
+            resetPasswordExpires: { $gt: Date.now() },
+        });
+
+        if (!user) {
+            return res.json({ success: false, message: "This reset link is invalid or has expired." });
+        }
+
+        user.password = await bcrypt.hash(newPassword, 10);
+        user.resetPasswordToken = null;
+        user.resetPasswordExpires = null;
+        await user.save();
+
+        res.json({ success: true, message: "Password reset successfully. You can now log in." });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
 // body: { currentPassword?, newPassword }
 // currentPassword is required only if the account already has a password set —
 // Google-only accounts can set their first password without one.

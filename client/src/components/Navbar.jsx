@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../context/AppContext";
 import { HiOutlinePencilAlt } from "react-icons/hi";
 import ResetPasswordModal from "./ResetPasswordModal";
+import NotificationBell from "./NotificationBell";
 
 const Navbar = () => {
   const { navigate, token, user, logout } = useAppContext();
@@ -32,6 +33,8 @@ const Navbar = () => {
             <HiOutlinePencilAlt size={16} />
             <span className="hidden sm:inline">Write</span>
           </button>
+
+          <NotificationBell />
 
           <div className="relative">
           <button

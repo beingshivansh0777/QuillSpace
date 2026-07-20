@@ -59,6 +59,20 @@ const MyProfile = () => {
     }
   };
 
+  const handlePublishNow = async (blogId) => {
+    try {
+      const { data } = await axios.post("/api/blog/publish-now", { id: blogId });
+      if (data.success) {
+        toast.success(data.message);
+        fetchMyPosts();
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message);
+    }
+  };
+
   const handleUnsave = async (blogId) => {
     try {
       const { data } = await axios.post("/api/blog/bookmark", { blogId });
@@ -144,7 +158,15 @@ const MyProfile = () => {
           myPosts.length > 0 ? (
             <div className="flex flex-col gap-3">
               {myPosts.map((blog) => {
-                const editable = Date.now() - new Date(blog.createdAt).getTime() <= EDIT_WINDOW_MS;
+                const editable = !blog.isPublished ||
+                  Date.now() - new Date(blog.publishedAt).getTime() <= EDIT_WINDOW_MS;
+
+                const status = blog.isPublished
+                  ? "Published"
+                  : blog.scheduledFor
+                  ? `Scheduled · ${Moment(blog.scheduledFor).format("MMM D, h:mm A")}`
+                  : "Draft";
+
                 return (
                   <div
                     key={blog._id}
@@ -159,10 +181,18 @@ const MyProfile = () => {
                         {blog.title}
                       </p>
                       <p className="text-xs text-[#241F2E]/40 mt-1">
-                        {Moment(blog.createdAt).format("MMM D, YYYY")} · {blog.isPublished ? "Published" : "Unpublished"}
+                        {Moment(blog.createdAt).format("MMM D, YYYY")} · {status}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {!blog.isPublished && (
+                        <button
+                          onClick={() => handlePublishNow(blog._id)}
+                          className="text-xs font-medium text-green-600 border border-green-200 hover:bg-green-50 rounded-full px-3 py-1.5 transition-colors cursor-pointer"
+                        >
+                          Publish now
+                        </button>
+                      )}
                       {editable ? (
                         <button
                           onClick={() => navigate(`/edit/${blog._id}`)}

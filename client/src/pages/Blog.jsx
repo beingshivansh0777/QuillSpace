@@ -33,8 +33,13 @@ const Blog = () => {
       const { data } = await axios.get(`/api/blog/${id}`);
       if (data.success) {
         setData(data.blog);
-        setLikes(data.blog.likes || 0);
-        setDislikes(data.blog.dislikes || 0);
+        setLikes(data.blog.likedBy?.length || 0);
+        setDislikes(data.blog.dislikedBy?.length || 0);
+        if (user?._id) {
+          if (data.blog.likedBy?.includes(user._id)) setMyVote("like");
+          else if (data.blog.dislikedBy?.includes(user._id)) setMyVote("dislike");
+          else setMyVote("none");
+        }
       } else {
         toast.error(data.message);
       }
@@ -155,6 +160,11 @@ const Blog = () => {
   };
 
   const handleVote = async (type) => {
+    if (!token) {
+      toast.error("Please login to vote.");
+      return;
+    }
+
     const newType = myVote === type ? "none" : type;
     const previousType = myVote;
 
@@ -168,19 +178,18 @@ const Blog = () => {
       const { data } = await axios.post("/api/blog/vote", {
         blogId: id,
         type: newType,
-        previousType,
       });
 
       if (data.success) {
         setLikes(data.likes);
         setDislikes(data.dislikes);
-        localStorage.setItem(`vote_${id}`, newType);
+        setMyVote(data.myVote);
       } else {
         toast.error(data.message);
         fetchBlogData();
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
       fetchBlogData();
     }
   };
@@ -189,15 +198,12 @@ const Blog = () => {
     fetchBlogData();
     fetchComments();
 
-    const storedVote = localStorage.getItem(`vote_${id}`);
-    if (storedVote) setMyVote(storedVote);
-
     if (token) {
       axios.get(`/api/blog/bookmark-status/${id}`).then(({ data }) => {
         if (data.success) setBookmarked(data.bookmarked);
       }).catch(() => {});
     }
-  }, [token]);
+  }, [token, user]);
 
   const toggleBookmark = async () => {
     if (!token) {

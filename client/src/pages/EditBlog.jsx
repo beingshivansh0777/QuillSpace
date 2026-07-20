@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import Loader from "../components/Loader";
+import { HiSparkles } from "react-icons/hi";
 
 const EDIT_WINDOW_MS = 30 * 60 * 1000;
 
@@ -38,7 +39,9 @@ const EditBlog = () => {
         }
 
         const isOwner = data.blog.author?._id === user?._id;
-        const age = Date.now() - new Date(data.blog.createdAt).getTime();
+        const age = data.blog.isPublished
+          ? Date.now() - new Date(data.blog.publishedAt).getTime()
+          : 0; // drafts/scheduled posts are always editable
 
         if (!isOwner || age > EDIT_WINDOW_MS) {
           setNotAllowed(true);
@@ -192,11 +195,12 @@ const EditBlog = () => {
             )}
             <button
               disabled={loadingAI}
-              className="absolute bottom-1 right-2 ml-2 text-white bg-[#241F2E]/80 px-4 py-1.5 text-xs rounded cursor-pointer hover:bg-[#241F2E] transition-colors"
+              className="absolute bottom-1 right-2 ml-2 flex items-center gap-1.5 text-white px-4 py-2 text-xs font-medium rounded-full cursor-pointer transition-all bg-[linear-gradient(135deg,#5044E5,#8B5CF6)] shadow-[0_4px_14px_-2px_rgba(80,68,229,0.5)] hover:shadow-[0_6px_18px_-2px_rgba(80,68,229,0.65)] hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               type="button"
               onClick={generateContent}
             >
-              Regenerate with AI
+              <HiSparkles size={14} className={loadingAI ? "animate-pulse" : ""} />
+              {loadingAI ? "Generating…" : "Regenerate with AI"}
             </button>
           </div>
 

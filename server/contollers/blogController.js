@@ -3,11 +3,12 @@ import imagekit from "../configs/imageKit.js";
 import Blog from "../models/blogModel.js";
 import Comment from "../models/commentModel.js";
 import User from "../models/userModel.js";
+import Notification from "../models/notificationModel.js";
 import main from "../configs/gemini.js";
 
 export const addBlog = async (req, res) => {
   try {
-    const { title, subTitle, description, category } = JSON.parse(
+    const { title, subTitle, description, category, isPublished, scheduledFor } = JSON.parse(
       req.body.blog
     );
     const imageFile = req.file;
@@ -15,6 +16,18 @@ export const addBlog = async (req, res) => {
     if (!title || !description || !category || !imageFile) {
       return res.json({ success: false, message: "Missing required field." });
     }
+
+    let publishNow = !!isPublished;
+    let scheduleDate = null;
+
+    if (scheduledFor) {
+      scheduleDate = new Date(scheduledFor);
+      if (isNaN(scheduleDate.getTime()) || scheduleDate <= new Date()) {
+        return res.json({ success: false, message: "Scheduled time must be in the future." });
+      }
+      publishNow = false; // a scheduled post isn't live yet, regardless of what else was sent
+    }
+
     const fileBuffer = fs.readFileSync(imageFile.path);
 
     const response = await imagekit.upload({
@@ -34,18 +47,25 @@ export const addBlog = async (req, res) => {
 
     const image = optimizedImageUrl;
 
-    // Blogs now go live immediately on submission — no admin review step.
     await Blog.create({
       title,
       subTitle,
       description,
       category,
       image,
-      isPublished: true,
+      isPublished: publishNow,
+      publishedAt: publishNow ? new Date() : null,
+      scheduledFor: scheduleDate,
       author: req.user.id,
     });
 
-    res.json({ success: true, message: "Blog published!" });
+    const message = scheduleDate
+      ? "Blog scheduled!"
+      : publishNow
+      ? "Blog published!"
+      : "Saved as draft.";
+
+    res.json({ success: true, message });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -127,6 +147,19 @@ export const addComment = async (req, res) => {
       parent: parent || null,
     });
 
+    // Notify the blog's author that someone commented — skip if they
+    // commented on their own post.
+    const blogDoc = await Blog.findById(blog).select("author");
+    if (blogDoc && blogDoc.author.toString() !== req.user.id) {
+      await Notification.create({
+        recipient: blogDoc.author,
+        actor: req.user.id,
+        type: "blog_comment",
+        blog,
+        comment: comment._id,
+      });
+    }
+
     const populated = await comment.populate("user", "name username avatar");
     res.json({ success: true, message: "Comment posted!", comment: populated });
   } catch (error) {
@@ -168,18 +201,31 @@ export const toggleCommentLike = async (req, res) => {
       return res.json({ success: false, message: "Comment not found." });
     }
 
-    const index = comment.likes.findIndex((u) => u.toString() === req.user.id);
-    let liked;
-    if (index === -1) {
-      comment.likes.push(req.user.id);
-      liked = true;
-    } else {
-      comment.likes.splice(index, 1);
-      liked = false;
+    const alreadyLiked = comment.likes.some((u) => u.toString() === req.user.id);
+
+    // Atomic $addToSet/$pull — updates only the `likes` array without
+    // re-validating the rest of the document (important for comments
+    // created before the `user` field existed on the schema).
+    const updated = await Comment.findByIdAndUpdate(
+      commentId,
+      alreadyLiked
+        ? { $pull: { likes: req.user.id } }
+        : { $addToSet: { likes: req.user.id } },
+      { new: true }
+    );
+
+    // Only notify on a fresh like, not on unlike, and never notify yourself.
+    if (!alreadyLiked && comment.user.toString() !== req.user.id) {
+      await Notification.create({
+        recipient: comment.user,
+        actor: req.user.id,
+        type: "comment_like",
+        blog: comment.blog,
+        comment: comment._id,
+      });
     }
 
-    await comment.save();
-    res.json({ success: true, liked, likeCount: comment.likes.length });
+    res.json({ success: true, liked: !alreadyLiked, likeCount: updated.likes.length });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -210,10 +256,14 @@ export const updateBlog = async (req, res) => {
       return res.json({ success: false, message: "You can only edit your own posts." });
     }
 
-    const age = Date.now() - new Date(blog.createdAt).getTime();
-    if (age > EDIT_WINDOW_MS) {
-      return res.json({ success: false, message: "The 30-minute edit window has passed." });
+    if (blog.isPublished) {
+      const age = Date.now() - new Date(blog.publishedAt).getTime();
+      if (age > EDIT_WINDOW_MS) {
+        return res.json({ success: false, message: "The 30-minute edit window has passed." });
+      }
     }
+    // Drafts and scheduled (not yet published) posts have no time limit —
+    // nobody's seen them yet, so there's nothing to protect against.
 
     const { title, subTitle, description, category } = JSON.parse(req.body.blog);
 
@@ -241,6 +291,33 @@ export const updateBlog = async (req, res) => {
 
     await blog.save();
     res.json({ success: true, message: "Blog updated.", blog });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// POST /api/blog/publish-now — author manually publishes their own draft/scheduled post
+export const publishOwnBlog = async (req, res) => {
+  try {
+    const { id } = req.body;
+    const blog = await Blog.findById(id);
+
+    if (!blog) {
+      return res.json({ success: false, message: "Blog not found." });
+    }
+    if (blog.author.toString() !== req.user.id) {
+      return res.json({ success: false, message: "You can only publish your own posts." });
+    }
+    if (blog.isPublished) {
+      return res.json({ success: false, message: "This post is already published." });
+    }
+
+    blog.isPublished = true;
+    blog.publishedAt = new Date();
+    blog.scheduledFor = null;
+    await blog.save();
+
+    res.json({ success: true, message: "Blog published!" });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -317,26 +394,42 @@ export const getBookmarkedBlogs = async (req, res) => {
   }
 };
 
+// POST /api/blog/vote — requires login. body: { blogId, type }
+// type: "like" | "dislike" | "none" (clicking an active vote again removes it)
 export const voteBlog = async (req, res) => {
   try {
-    const { blogId, type, previousType } = req.body;
-
+    const { blogId, type } = req.body;
     const validTypes = ["like", "dislike", "none"];
-    if (!validTypes.includes(type) || !validTypes.includes(previousType)) {
+    if (!validTypes.includes(type)) {
       return res.json({ success: false, message: "Invalid vote type." });
     }
 
-    const update = {};
-    if (previousType === "like") update.likes = (update.likes || 0) - 1;
-    if (previousType === "dislike") update.dislikes = (update.dislikes || 0) - 1;
-    if (type === "like") update.likes = (update.likes || 0) + 1;
-    if (type === "dislike") update.dislikes = (update.dislikes || 0) + 1;
+    const userId = req.user.id;
 
-    const blog = await Blog.findByIdAndUpdate(
-      blogId,
-      { $inc: update },
-      { new: true }
-    );
+    // Step 1: always remove the user from both arrays first (in its own
+    // update — MongoDB won't allow $pull and $addToSet on the same field
+    // in a single call, which is what caused the "conflict" error).
+    await Blog.findByIdAndUpdate(blogId, {
+      $pull: { likedBy: userId, dislikedBy: userId },
+    });
+
+    // Step 2: add them to the correct array, if voting for one.
+    let blog;
+    if (type === "like") {
+      blog = await Blog.findByIdAndUpdate(
+        blogId,
+        { $addToSet: { likedBy: userId } },
+        { new: true }
+      );
+    } else if (type === "dislike") {
+      blog = await Blog.findByIdAndUpdate(
+        blogId,
+        { $addToSet: { dislikedBy: userId } },
+        { new: true }
+      );
+    } else {
+      blog = await Blog.findById(blogId);
+    }
 
     if (!blog) {
       return res.json({ success: false, message: "Blog not found." });
@@ -344,8 +437,13 @@ export const voteBlog = async (req, res) => {
 
     res.json({
       success: true,
-      likes: blog.likes,
-      dislikes: blog.dislikes,
+      likes: blog.likedBy.length,
+      dislikes: blog.dislikedBy.length,
+      myVote: blog.likedBy.some((u) => u.toString() === userId)
+        ? "like"
+        : blog.dislikedBy.some((u) => u.toString() === userId)
+        ? "dislike"
+        : "none",
     });
   } catch (error) {
     res.json({ success: false, message: error.message });

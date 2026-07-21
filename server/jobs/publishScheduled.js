@@ -1,24 +1,40 @@
 import Blog from "../models/blogModel.js";
+import Notification from "../models/notificationModel.js";
 
-// Publishes any post whose scheduled time has arrived. Runs on a timer
-// (wired up in server.js via node-cron) rather than being triggered by
-// any request — nobody needs to visit the site for a scheduled post to go live.
+// Publishes any post whose scheduled time has arrived, and notifies its
+// author. Runs on a timer (wired up in server.js via node-cron) rather
+// than being triggered by any request.
 const publishScheduledBlogs = async () => {
   try {
-    const result = await Blog.updateMany(
+    // Find matching posts FIRST — updateMany alone wouldn't tell us which
+    // specific blogs/authors to notify afterward.
+    const dueBlogs = await Blog.find({
+      isPublished: false,
+      scheduledFor: { $ne: null, $lte: new Date() },
+    }).select("_id author");
+
+    if (dueBlogs.length === 0) return;
+
+    const now = new Date();
+
+    await Blog.updateMany(
+      { _id: { $in: dueBlogs.map((b) => b._id) } },
       {
-        isPublished: false,
-        scheduledFor: { $ne: null, $lte: new Date() },
-      },
-      {
-        $set: { isPublished: true, publishedAt: new Date() },
+        $set: { isPublished: true, publishedAt: now },
         $unset: { scheduledFor: "" },
       }
     );
 
-    if (result.modifiedCount > 0) {
-      console.log(`[scheduler] Published ${result.modifiedCount} scheduled blog(s).`);
-    }
+    await Notification.insertMany(
+      dueBlogs.map((blog) => ({
+        recipient: blog.author,
+        actor: null,
+        type: "schedule_published",
+        blog: blog._id,
+      }))
+    );
+
+    console.log(`[scheduler] Published ${dueBlogs.length} scheduled blog(s).`);
   } catch (error) {
     console.log("[scheduler] Failed to publish scheduled blogs:", error.message);
   }

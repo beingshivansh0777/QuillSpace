@@ -10,11 +10,11 @@ const notificationSchema = new mongoose.Schema(
     actor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null, // null for system-triggered notifications (e.g. scheduled publish)
     },
     type: {
       type: String,
-      enum: ["blog_comment", "comment_like"],
+      enum: ["blog_comment", "comment_like", "schedule_published"],
       required: true,
     },
     blog: {

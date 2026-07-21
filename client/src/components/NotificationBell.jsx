@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { HiOutlineBell } from "react-icons/hi";
+import { HiOutlineBell, HiSparkles } from "react-icons/hi";
 import Moment from "moment";
 import { useAppContext } from "../context/AppContext";
 
@@ -74,6 +74,9 @@ const NotificationBell = () => {
     if (notif.type === "comment_like") {
       return `${actorName} liked your comment on "${notif.blog?.title || "a post"}"`;
     }
+    if (notif.type === "schedule_published") {
+      return `Your scheduled blog "${notif.blog?.title || "a post"}" is now published!`;
+    }
     return "New notification";
   };
 
@@ -123,7 +126,9 @@ const NotificationBell = () => {
               >
                 <div className="flex items-start gap-2.5">
                   <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold flex-shrink-0 overflow-hidden">
-                    {notif.actor?.avatar ? (
+                    {notif.type === "schedule_published" ? (
+                      <HiSparkles size={14} />
+                    ) : notif.actor?.avatar ? (
                       <img src={notif.actor.avatar} alt="" className="w-full h-full object-cover" />
                     ) : (
                       notif.actor?.name?.charAt(0).toUpperCase() || "?"

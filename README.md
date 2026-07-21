@@ -88,25 +88,85 @@ Built with **React (Vite) + Tailwind CSS** on the frontend and **Node.js + Expre
 
 ```
 QuillSpace/
-├── client/                 # React frontend (Vite)
-│   ├── src/
-│   │   ├── components/     # Navbar, BlogCard, BlogList, EditProfileModal, etc.
-│   │   ├── components/admin/  # Sidebar, Login, CommentTableItem, BlogTableItem
-│   │   ├── pages/           # Home, Blog, WriteBlog, EditBlog, MyProfile, PublicProfile...
-│   │   ├── pages/admin/     # Layout, Dashboard, ListBlog, Comments
-│   │   ├── context/          # AppContext.jsx
-│   │   └── main.jsx
-│   └── .env
-└── server/                  # Express backend
-    ├── configs/              # db.js, imageKit.js, gemini.js, resendConfig.js
-    ├── contollers/           # authController, blogController, adminController, notificationController
-    ├── middleware/           # auth.js, adminAuth.js, multer.js
-    ├── models/               # userModel, Blog, commentModel, Notification
-    ├── routes/               # authRoutes, blogRoutes, adminRoutes, notificationRoutes
-    ├── jobs/                 # publishScheduled.js
-    ├── createAdmin.js
-    ├── server.js
-    └── .env
+├── client/                          # React frontend (Vite)
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── vercel.json                  # Vercel deployment config
+│   ├── eslint.config.js
+│   ├── public/
+│   │   ├── title.jpeg
+│   │   └── vite.svg
+│   └── src/
+│       ├── main.jsx
+│       ├── App.jsx
+│       ├── App.css
+│       ├── index.css
+│       ├── assets/                  # icons, logos, sample blog images, assets.js
+│       ├── context/
+│       │   └── AppContext.jsx       # global state: auth, token, user, blogs, axios instance
+│       ├── components/
+│       │   ├── Navbar.jsx
+│       │   ├── Header.jsx
+│       │   ├── BlogCard.jsx
+│       │   ├── BlogList.jsx
+│       │   ├── NewsLetter.jsx
+│       │   ├── Footer.jsx
+│       │   ├── Loader.jsx
+│       │   ├── EditProfileModal.jsx
+│       │   ├── ResetPasswordModal.jsx
+│       │   ├── NotificationBell.jsx
+│       │   └── admin/
+│       │       ├── Login.jsx
+│       │       ├── Sidebar.jsx
+│       │       ├── BlogTableItem.jsx
+│       │       └── CommentTableItem.jsx
+│       └── pages/
+│           ├── Home.jsx
+│           ├── Blog.jsx                 # blog detail: comments, votes, bookmark, share
+│           ├── WriteBlog.jsx            # publish now / draft / schedule
+│           ├── EditBlog.jsx             # 30-minute edit window enforced
+│           ├── MyProfile.jsx            # My Posts + Saved Blogs tabs
+│           ├── PublicProfile.jsx        # /user/:username
+│           ├── ForgetPassword.jsx
+│           ├── ResetPassword.jsx
+│           └── admin/
+│               ├── Layout.jsx
+│               ├── Dashboard.jsx        # analytics + charts
+│               ├── ListBlog.jsx
+│               └── Comments.jsx
+│
+└── server/                          # Express backend
+    ├── server.js                    # app entry point, route mounting, cron wiring
+    ├── createAdmin.js                # one-time admin seed script
+    ├── package.json
+    ├── vercel.json                   # Render/Vercel deployment config
+    ├── configs/
+    │   ├── db.js                     # MongoDB connection
+    │   ├── imageKit.js                # image upload config
+    │   ├── gemini.js                  # AI content generation config
+    │   └── resend.js                  # transactional email config
+    ├── models/
+    │   ├── userModel.js               # username, bio, avatar, bookmarks, role, resetToken
+    │   ├── blogModel.js                # author, isPublished, scheduledFor, likedBy/dislikedBy
+    │   ├── commentModel.js             # user, parent (for replies), likes
+    │   └── notificationModel.js
+    ├── contollers/
+    │   ├── authController.js          # register, login, Google auth, profile, password flows
+    │   ├── blogController.js          # CRUD, publishing modes, voting, comments, bookmarks
+    │   ├── adminController.js          # dashboard analytics, moderation, promote-to-admin
+    │   └── notificationController.js
+    ├── routes/
+    │   ├── authRoutes.js
+    │   ├── blogRoutes.js
+    │   ├── adminRoutes.js
+    │   └── notificationRoutes.js
+    ├── middleware/
+    │   ├── auth.js                    # any logged-in user
+    │   ├── adminAuth.js                # admin-only
+    │   └── multer.js                   # file upload handling
+    └── jobs/
+        └── publishScheduled.js         # cron job: auto-publishes scheduled posts every minute
 ```
 
 ---
@@ -219,5 +279,4 @@ Authorization: Bearer <admin_token>
 - **Backend:** Render (or similar) — set every variable from `server/.env` in the platform's Environment tab (local `.env` files are never deployed automatically)
 - **MongoDB Atlas:** under Network Access, allow `0.0.0.0/0` since most hosts (Render, Vercel) use dynamic outbound IPs
 - **Scheduled posts on free-tier hosting:** Render's free tier spins the server down when idle. A post scheduled to publish while the server is asleep won't go live until the next incoming request wakes it up — consider an uptime-ping service or a paid tier if exact-time publishing matters for your use case.
-
 

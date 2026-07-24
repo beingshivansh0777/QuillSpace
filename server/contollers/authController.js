@@ -4,6 +4,8 @@ import crypto from "crypto";
 import fs from "fs";
 import { OAuth2Client } from "google-auth-library";
 import User from "../models/userModel.js";
+import Blog from "../models/blogModel.js";
+import Comment from "../models/commentModel.js";
 import imagekit from "../configs/imageKit.js";
 import resend from "../configs/resend.js";
 
@@ -15,6 +17,49 @@ const generateToken = (user) => {
         process.env.JWT_SECRET,
         { expiresIn: "7d" }
     );
+};
+
+const sendWelcomeEmail = async (user) => {
+    try {
+        await resend.emails.send({
+            from: "QuillSpace <onboarding@resend.dev>",
+            to: user.email,
+            subject: "Welcome to QuillSpace",
+            html: `
+                <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+                    <h2 style="color: #241F2E;">Welcome, ${user.name}!</h2>
+                    <p style="color: #444;">Your QuillSpace account is ready. Start reading, writing, and connecting with other writers.</p>
+                    <p style="margin: 24px 0;">
+                        <a href="${process.env.CLIENT_URL}" style="background: #5044E5; color: white; padding: 12px 28px; border-radius: 999px; text-decoration: none; font-weight: 600;">
+                            Go to QuillSpace
+                        </a>
+                    </p>
+                </div>
+            `,
+        });
+    } catch (error) {
+        console.log("Failed to send welcome email:", error.message);
+        // Never block registration on an email failure.
+    }
+};
+
+const sendPasswordChangedEmail = async (user, context) => {
+    try {
+        await resend.emails.send({
+            from: "QuillSpace <onboarding@resend.dev>",
+            to: user.email,
+            subject: "Your QuillSpace password was changed",
+            html: `
+                <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+                    <h2 style="color: #241F2E;">Password ${context}</h2>
+                    <p style="color: #444;">This is a confirmation that your QuillSpace account password was just ${context}.</p>
+                    <p style="color: #888; font-size: 13px;">If you didn't do this, reset your password immediately and consider reviewing your account activity.</p>
+                </div>
+            `,
+        });
+    } catch (error) {
+        console.log("Failed to send password-changed email:", error.message);
+    }
 };
 
 // REGISTER
@@ -33,6 +78,8 @@ export const registerUser = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = await User.create({ name, email, password: hashedPassword });
+
+        sendWelcomeEmail(user); // fire-and-forget — don't block the response on email delivery
 
         const token = generateToken(user);
         res.json({ success: true, token, message: "Registration successful!" });
@@ -102,6 +149,7 @@ export const googleAuth = async (req, res) => {
                 });
             }
             user = await User.create({ name, email, googleId });
+            sendWelcomeEmail(user);
         } else {
             // mode === "login"
             if (!user) {
@@ -234,11 +282,52 @@ export const resetPassword = async (req, res) => {
         user.resetPasswordExpires = null;
         await user.save();
 
+        sendPasswordChangedEmail(user, "reset");
+
         res.json({ success: true, message: "Password reset successfully. You can now log in." });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
 };
+
+// DELETE /api/auth/delete-account
+// body: { password? } — required only for accounts that have a password set.
+export const deleteAccount = async (req, res) => {
+    try {
+        const { password } = req.body;
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.json({ success: false, message: "User not found." });
+        }
+
+        if (user.password) {
+            if (!password) {
+                return res.json({ success: false, message: "Please enter your password to confirm." });
+            }
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (!isMatch) {
+                return res.json({ success: false, message: "Incorrect password." });
+            }
+        }
+
+        // Cascade delete: their blogs, comments on those blogs, and their
+        // own comments elsewhere. Likes/bookmarks referencing this user
+        // that live on OTHER people's documents are left as-is — harmless
+        // orphaned IDs that don't affect counts or functionality.
+        const ownBlogs = await Blog.find({ author: user._id }).select("_id");
+        const ownBlogIds = ownBlogs.map((b) => b._id);
+
+        await Comment.deleteMany({ blog: { $in: ownBlogIds } });
+        await Comment.deleteMany({ user: user._id });
+        await Blog.deleteMany({ author: user._id });
+        await User.findByIdAndDelete(user._id);
+
+        res.json({ success: true, message: "Your account has been deleted." });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
 // body: { currentPassword?, newPassword }
 // currentPassword is required only if the account already has a password set —
 // Google-only accounts can set their first password without one.
@@ -267,6 +356,8 @@ export const changePassword = async (req, res) => {
 
         user.password = await bcrypt.hash(newPassword, 10);
         await user.save();
+
+        sendPasswordChangedEmail(user, "changed");
 
         res.json({ success: true, message: "Password updated successfully." });
     } catch (error) {

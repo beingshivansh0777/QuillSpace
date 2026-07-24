@@ -13,6 +13,7 @@ import Layout from './pages/admin/Layout.jsx'
 import Dashboard from './pages/admin/Dashboard.jsx'
 import ListBlog from './pages/admin/ListBlog.jsx'
 import Comments from './pages/admin/Comments.jsx'
+import Reports from './pages/admin/Reports.jsx'
 import Login from './components/admin/Login.jsx'
 
 import 'quill/dist/quill.snow.css'
@@ -41,6 +42,7 @@ const App = () => {
            <Route index element={<Dashboard/>}/>
             <Route path='listBlog' element={<ListBlog/>}/>
              <Route path='comments' element={<Comments/>}/>
+             <Route path='reports' element={<Reports/>}/>
         </Route>
        </Routes>
       

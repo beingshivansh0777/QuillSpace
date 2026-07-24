@@ -14,13 +14,19 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["blog_comment", "comment_like", "schedule_published"],
+      enum: ["blog_comment", "comment_like", "schedule_published", "blog_deleted", "comment_deleted"],
       required: true,
     },
     blog: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "blog",
-      required: true,
+      default: null,
+    },
+    title: {
+      // snapshot of the blog title — needed for blog_deleted notifications,
+      // since the referenced blog no longer exists to populate from
+      type: String,
+      default: null,
     },
     comment: {
       type: mongoose.Schema.Types.ObjectId,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { HiOutlineBell, HiSparkles } from "react-icons/hi";
+import { HiOutlineBell, HiSparkles, HiOutlineExclamationCircle } from "react-icons/hi";
 import Moment from "moment";
 import { useAppContext } from "../context/AppContext";
 
@@ -77,6 +77,12 @@ const NotificationBell = () => {
     if (notif.type === "schedule_published") {
       return `Your scheduled blog "${notif.blog?.title || "a post"}" is now published!`;
     }
+    if (notif.type === "blog_deleted") {
+      return `Your post "${notif.title || "a post"}" was deleted by an admin.`;
+    }
+    if (notif.type === "comment_deleted") {
+      return `Your comment on "${notif.blog?.title || "a post"}" was deleted by an admin.`;
+    }
     return "New notification";
   };
 
@@ -91,7 +97,7 @@ const NotificationBell = () => {
       >
         <HiOutlineBell size={22} className="text-[#241F2E]/70" />
         {unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
+          <span className="absolute top-1.5 right-1.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -125,9 +131,17 @@ const NotificationBell = () => {
                 }`}
               >
                 <div className="flex items-start gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold flex-shrink-0 overflow-hidden">
+                  <div
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 overflow-hidden ${
+                      notif.type === "blog_deleted" || notif.type === "comment_deleted"
+                        ? "bg-red-50 text-red-500"
+                        : "bg-primary/10 text-primary"
+                    }`}
+                  >
                     {notif.type === "schedule_published" ? (
                       <HiSparkles size={14} />
+                    ) : notif.type === "blog_deleted" || notif.type === "comment_deleted" ? (
+                      <HiOutlineExclamationCircle size={15} />
                     ) : notif.actor?.avatar ? (
                       <img src={notif.actor.avatar} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -141,7 +155,7 @@ const NotificationBell = () => {
                     </p>
                   </div>
                   {!notif.isRead && (
-                    <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1.5" />
+                    <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5" />
                   )}
                 </div>
               </button>

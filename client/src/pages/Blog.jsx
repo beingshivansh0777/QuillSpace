@@ -9,6 +9,8 @@ import { useAppContext } from "../context/AppContext";
 import toast from "react-hot-toast";
 import { FaWhatsapp, FaFacebook, FaInstagram, FaLink, FaThumbsUp, FaThumbsDown } from "react-icons/fa";
 import { FaRegBookmark, FaBookmark, FaRegHeart, FaHeart } from "react-icons/fa6";
+import { HiOutlineFlag } from "react-icons/hi";
+import ReportModal from "../components/ReportModel";
 
 const Blog = () => {
   const { id } = useParams();
@@ -27,6 +29,8 @@ const Blog = () => {
   const [dislikes, setDislikes] = useState(0);
   const [myVote, setMyVote] = useState("none");
   const [bookmarked, setBookmarked] = useState(false);
+  const [reportingBlog, setReportingBlog] = useState(false);
+  const [reportingComment, setReportingComment] = useState(null); // comment id, or null
 
   const fetchBlogData = async () => {
     try {
@@ -297,6 +301,28 @@ const Blog = () => {
           {data.category}
         </span>
 
+        {data.tags?.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-2 mt-3 max-w-lg mx-auto">
+            {data.tags.map((tag, i) => (
+              <span
+                key={i}
+                className="text-xs px-2.5 py-1 rounded-full bg-[#241F2E]/5 text-[#241F2E]/60"
+              >
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {token && (
+          <button
+            onClick={() => setReportingBlog(true)}
+            className="mt-3 flex items-center gap-1 text-xs text-[#241F2E]/35 hover:text-red-500 transition-colors mx-auto cursor-pointer"
+          >
+            <HiOutlineFlag size={12} /> Report
+          </button>
+        )}
+
         {data.author && (
           <p className="mt-4 text-sm text-[#241F2E]/50">
             Written by{" "}
@@ -402,6 +428,14 @@ const Blog = () => {
                     >
                       Reply
                     </button>
+                    {token && (
+                      <button
+                        onClick={() => setReportingComment(item._id)}
+                        className="text-xs text-[#241F2E]/35 hover:text-red-500 transition-colors cursor-pointer"
+                      >
+                        Report
+                      </button>
+                    )}
                   </div>
 
                   {replyingTo === item._id && (
@@ -548,6 +582,21 @@ const Blog = () => {
         </div>
       </div>
       <Footer />
+
+      {reportingBlog && (
+        <ReportModal
+          targetType="blog"
+          targetId={id}
+          onClose={() => setReportingBlog(false)}
+        />
+      )}
+      {reportingComment && (
+        <ReportModal
+          targetType="comment"
+          targetId={reportingComment}
+          onClose={() => setReportingComment(null)}
+        />
+      )}
     </div>
   ) : (
     <Loader />

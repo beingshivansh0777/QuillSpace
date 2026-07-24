@@ -28,6 +28,27 @@ const EditBlog = () => {
   const [title, setTitle] = useState("");
   const [subTitle, setSubTitle] = useState("");
   const [category, setCategory] = useState("");
+  const [tags, setTags] = useState([]);
+  const [tagInput, setTagInput] = useState("");
+
+  const addTag = () => {
+    const trimmed = tagInput.trim().replace(/^#/, "");
+    if (!trimmed) return;
+    if (tags.length >= 10) {
+      toast.error("Up to 10 tags.");
+      return;
+    }
+    if (tags.includes(trimmed)) {
+      setTagInput("");
+      return;
+    }
+    setTags((prev) => [...prev, trimmed]);
+    setTagInput("");
+  };
+
+  const removeTag = (tag) => {
+    setTags((prev) => prev.filter((t) => t !== tag));
+  };
 
   useEffect(() => {
     const fetchBlog = async () => {
@@ -52,6 +73,7 @@ const EditBlog = () => {
         setTitle(data.blog.title);
         setSubTitle(data.blog.subTitle);
         setCategory(data.blog.category);
+        setTags(data.blog.tags || []);
       } catch (error) {
         setNotAllowed(true);
       }
@@ -92,6 +114,7 @@ const EditBlog = () => {
         subTitle,
         description: quillRef.current.root.innerHTML,
         category,
+        tags,
       };
       const formData = new FormData();
       formData.append("blog", JSON.stringify(payload));
@@ -215,6 +238,39 @@ const EditBlog = () => {
               <option key={i} value={item}>{item}</option>
             ))}
           </select>
+
+          <p className="text-sm font-medium text-[#241F2E]/70 mt-6 mb-2">Tags (optional)</p>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-primary/10 text-primary"
+              >
+                #{tag}
+                <button
+                  type="button"
+                  onClick={() => removeTag(tag)}
+                  className="hover:text-red-500 cursor-pointer"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                addTag();
+              }
+            }}
+            onBlur={addTag}
+            placeholder="Type a tag and press Enter"
+            className="w-full sm:w-72 px-3 py-2.5 rounded-lg border border-[#241F2E]/15 outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all text-sm"
+          />
 
           <div className="flex gap-3 mt-8">
             <button

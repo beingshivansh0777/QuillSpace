@@ -4,13 +4,14 @@ import { useAppContext } from "../context/AppContext";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import EditProfileModal from "../components/EditProfileModal";
+import DeleteAccountModal from "../components/DeleteAccountModal";
 import Moment from "moment";
 import toast from "react-hot-toast";
 
 const EDIT_WINDOW_MS = 30 * 60 * 1000;
 
 const MyProfile = () => {
-  const { axios, token, user } = useAppContext();
+  const { axios, token, user, logout } = useAppContext();
   const navigate = useNavigate();
 
   const [tab, setTab] = useState("posts");
@@ -19,6 +20,7 @@ const MyProfile = () => {
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPhotoZoom, setShowPhotoZoom] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const fetchMyPosts = async () => {
     try {
@@ -109,7 +111,7 @@ const MyProfile = () => {
         <div className="flex items-center gap-4 mb-10">
           <div
             onClick={() => user?.avatar && setShowPhotoZoom(true)}
-            className={`w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-2xl font-semibold flex-shrink-0 overflow-hidden ${
+            className={`w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-2xl font-semibold shrink-0 overflow-hidden ${
               user?.avatar ? "cursor-pointer hover:opacity-90 transition-opacity" : ""
             }`}
           >
@@ -126,7 +128,7 @@ const MyProfile = () => {
           </div>
           <button
             onClick={() => setShowEditModal(true)}
-            className="text-sm font-medium text-primary border border-primary/30 hover:bg-primary/5 rounded-full px-4 py-2 transition-colors cursor-pointer flex-shrink-0"
+            className="text-sm font-medium text-primary border border-primary/30 hover:bg-primary/5 rounded-full px-4 py-2 transition-colors cursor-pointer shrink-0"
           >
             Edit
           </button>
@@ -172,7 +174,7 @@ const MyProfile = () => {
                     key={blog._id}
                     className="flex items-center gap-4 bg-white border border-[#241F2E]/8 rounded-xl p-4"
                   >
-                    <img src={blog.image} alt="" className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
+                    <img src={blog.image} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p
                         onClick={() => navigate(`/blog/${blog._id}`)}
@@ -183,8 +185,16 @@ const MyProfile = () => {
                       <p className="text-xs text-[#241F2E]/40 mt-1">
                         {Moment(blog.createdAt).format("MMM D, YYYY")} · {status}
                       </p>
+                      {blog.isPublished && (
+                        <div className="flex items-center gap-3 mt-1.5 text-xs text-[#241F2E]/50">
+                          <span>👁 {blog.views || 0}</span>
+                          <span>👍 {blog.likeCount || 0}</span>
+                          <span>👎 {blog.dislikeCount || 0}</span>
+                          <span>💬 {blog.commentCount || 0}</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                       {!blog.isPublished && (
                         <button
                           onClick={() => handlePublishNow(blog._id)}
@@ -229,7 +239,7 @@ const MyProfile = () => {
                 key={blog._id}
                 className="flex items-center gap-4 bg-white border border-[#241F2E]/8 rounded-xl p-4"
               >
-                <img src={blog.image} alt="" className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
+                <img src={blog.image} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p
                     onClick={() => navigate(`/blog/${blog._id}`)}
@@ -243,7 +253,7 @@ const MyProfile = () => {
                 </div>
                 <button
                   onClick={() => handleUnsave(blog._id)}
-                  className="text-xs font-medium text-[#241F2E]/50 border border-[#241F2E]/15 hover:bg-[#241F2E]/5 rounded-full px-3 py-1.5 transition-colors cursor-pointer flex-shrink-0"
+                  className="text-xs font-medium text-[#241F2E]/50 border border-[#241F2E]/15 hover:bg-[#241F2E]/5 rounded-full px-3 py-1.5 transition-colors cursor-pointer shrink-0"
                 >
                   Remove
                 </button>
@@ -258,16 +268,37 @@ const MyProfile = () => {
             </Link>
           </div>
         )}
+
+        {/* Danger Zone */}
+        <div className="mt-16 pt-6 border-t border-red-100">
+          <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2">Danger Zone</p>
+          <p className="text-sm text-[#241F2E]/50 mb-3">
+            Deleting your account permanently removes your profile, posts, and comments. This can't be undone.
+          </p>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="text-sm font-medium text-red-500 border border-red-200 hover:bg-red-50 rounded-full px-4 py-2 transition-colors cursor-pointer"
+          >
+            Delete my account
+          </button>
+        </div>
       </div>
 
       <Footer />
 
       {showEditModal && <EditProfileModal onClose={() => setShowEditModal(false)} />}
 
+      {showDeleteModal && (
+        <DeleteAccountModal
+          hasPassword={user?.hasPassword}
+          onClose={() => setShowDeleteModal(false)}
+        />
+      )}
+
       {showPhotoZoom && user?.avatar && (
         <div
           onClick={() => setShowPhotoZoom(false)}
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] px-4 cursor-zoom-out"
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-100 px-4 cursor-zoom-out"
         >
           <button
             onClick={() => setShowPhotoZoom(false)}

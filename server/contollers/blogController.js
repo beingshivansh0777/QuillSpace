@@ -8,7 +8,7 @@ import main from "../configs/gemini.js";
 
 export const addBlog = async (req, res) => {
   try {
-    const { title, subTitle, description, category, isPublished, scheduledFor } = JSON.parse(
+    const { title, subTitle, description, category, isPublished, scheduledFor, tags } = JSON.parse(
       req.body.blog
     );
     const imageFile = req.file;
@@ -53,6 +53,7 @@ export const addBlog = async (req, res) => {
       description,
       category,
       image,
+      tags: Array.isArray(tags) ? tags.filter(Boolean).slice(0, 10) : [],
       isPublished: publishNow,
       publishedAt: publishNow ? new Date() : null,
       scheduledFor: scheduleDate,
@@ -85,7 +86,11 @@ export const getAllBlogs = async (req, res) => {
 export const getBlogById = async (req, res) => {
   try {
     const { blogId } = req.params;
-    const blog = await Blog.findById(blogId).populate("author", "name username");
+    const blog = await Blog.findByIdAndUpdate(
+      blogId,
+      { $inc: { views: 1 } },
+      { new: true }
+    ).populate("author", "name username");
     if (!blog) {
       return res.json({ success: false, message: "Blog Not Found!" });
     }
@@ -95,11 +100,27 @@ export const getBlogById = async (req, res) => {
   }
 };
 
-// Blogs written by the currently logged-in user (any status)
+// Blogs written by the currently logged-in user (any status), with a
+// comment count attached to each — powers the "My Posts" analytics view.
 export const getMyBlogs = async (req, res) => {
   try {
-    const blogs = await Blog.find({ author: req.user.id }).sort({ createdAt: -1 });
-    res.json({ success: true, blogs });
+    const blogs = await Blog.find({ author: req.user.id }).sort({ createdAt: -1 }).lean();
+
+    const commentCounts = await Comment.aggregate([
+      { $match: { blog: { $in: blogs.map((b) => b._id) } } },
+      { $group: { _id: "$blog", count: { $sum: 1 } } },
+    ]);
+    const countMap = {};
+    commentCounts.forEach((c) => { countMap[c._id.toString()] = c.count; });
+
+    const enriched = blogs.map((b) => ({
+      ...b,
+      commentCount: countMap[b._id.toString()] || 0,
+      likeCount: (b.likedBy || []).length,
+      dislikeCount: (b.dislikedBy || []).length,
+    }));
+
+    res.json({ success: true, blogs: enriched });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -108,8 +129,24 @@ export const getMyBlogs = async (req, res) => {
 export const deleteBlogById = async (req, res) => {
   try {
     const { id } = req.body;
+    const blog = await Blog.findById(id).select("title author");
+    if (!blog) {
+      return res.json({ success: false, message: "Blog not found." });
+    }
+
     await Blog.findByIdAndDelete(id);
     await Comment.deleteMany({ blog: id });
+
+    // Notify the author — skip if an admin deleted their own post.
+    if (blog.author.toString() !== req.user.id) {
+      await Notification.create({
+        recipient: blog.author,
+        actor: null,
+        type: "blog_deleted",
+        title: blog.title,
+      });
+    }
+
     res.json({ success: true, message: "Blog deleted successfully." });
   } catch (error) {
     res.json({ success: false, message: error.message });
@@ -265,12 +302,13 @@ export const updateBlog = async (req, res) => {
     // Drafts and scheduled (not yet published) posts have no time limit —
     // nobody's seen them yet, so there's nothing to protect against.
 
-    const { title, subTitle, description, category } = JSON.parse(req.body.blog);
+    const { title, subTitle, description, category, tags } = JSON.parse(req.body.blog);
 
     blog.title = title ?? blog.title;
     blog.subTitle = subTitle ?? blog.subTitle;
     blog.description = description ?? blog.description;
     blog.category = category ?? blog.category;
+    if (Array.isArray(tags)) blog.tags = tags.filter(Boolean).slice(0, 10);
 
     if (req.file) {
       const fileBuffer = fs.readFileSync(req.file.path);

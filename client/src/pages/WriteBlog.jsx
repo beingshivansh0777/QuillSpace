@@ -24,6 +24,27 @@ const WriteBlog = () => {
   const [category, setCategory] = useState("");
   const [publishMode, setPublishMode] = useState("publish"); // "publish" | "draft" | "schedule"
   const [scheduledFor, setScheduledFor] = useState("");
+  const [tags, setTags] = useState([]);
+  const [tagInput, setTagInput] = useState("");
+
+  const addTag = () => {
+    const trimmed = tagInput.trim().replace(/^#/, "");
+    if (!trimmed) return;
+    if (tags.length >= 10) {
+      toast.error("Up to 10 tags.");
+      return;
+    }
+    if (tags.includes(trimmed)) {
+      setTagInput("");
+      return;
+    }
+    setTags((prev) => [...prev, trimmed]);
+    setTagInput("");
+  };
+
+  const removeTag = (tag) => {
+    setTags((prev) => prev.filter((t) => t !== tag));
+  };
 
   const publishOptions = [
     {
@@ -68,6 +89,7 @@ const WriteBlog = () => {
         category,
         isPublished: publishMode === "publish",
         scheduledFor: publishMode === "schedule" ? new Date(scheduledFor).toISOString() : null,
+        tags,
       };
       const formData = new FormData();
       formData.append("blog", JSON.stringify(blog));
@@ -81,6 +103,7 @@ const WriteBlog = () => {
         setSubTitle("");
         quillRef.current.root.innerHTML = "";
         setCategory("");
+        setTags([]);
         navigate(publishMode === "publish" ? "/" : "/profile");
       } else {
         toast.error(data.message);
@@ -228,6 +251,39 @@ const WriteBlog = () => {
             </span>
           </div>
 
+          <p className="text-sm font-medium text-[#241F2E]/70 mt-6 mb-2">Tags (optional)</p>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-primary/10 text-primary"
+              >
+                #{tag}
+                <button
+                  type="button"
+                  onClick={() => removeTag(tag)}
+                  className="hover:text-red-500 cursor-pointer"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                addTag();
+              }
+            }}
+            onBlur={addTag}
+            placeholder="Type a tag and press Enter"
+            className="w-full sm:w-72 px-3 py-2.5 rounded-lg border border-[#241F2E]/15 outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all text-sm"
+          />
+
           {/* Publishing options */}
           <div className="mt-8 pt-6 border-t border-[#241F2E]/8">
             <p className="text-sm font-semibold text-[#241F2E] mb-3">Publishing</p>
@@ -253,7 +309,7 @@ const WriteBlog = () => {
                         className={selected ? "text-primary" : "text-[#241F2E]/50"}
                       />
                       {selected && (
-                        <span className="w-4 h-4 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                        <span className="w-4 h-4 rounded-full bg-primary flex items-center justify-center shrink-0">
                           <span className="w-1.5 h-1.5 rounded-full bg-white" />
                         </span>
                       )}

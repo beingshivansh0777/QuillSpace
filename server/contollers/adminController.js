@@ -1,6 +1,7 @@
 import Blog from "../models/blogModel.js";
 import Comment from "../models/commentModel.js";
 import User from "../models/userModel.js";
+import Notification from "../models/notificationModel.js";
 
 
 
@@ -150,8 +151,25 @@ export const getDashboard = async (req, res) => {
 export const deleteCommentbyId = async (req, res) => {
     try {
         const { id } = req.body;
+        const comment = await Comment.findById(id).select("user blog");
+        if (!comment) {
+            return res.json({ success: false, message: "Comment not found." });
+        }
+
         await Comment.findByIdAndDelete(id);
         await Comment.deleteMany({ parent: id });
+
+        // Notify the commenter — skip legacy comments with no user ref,
+        // and skip if an admin deleted their own comment.
+        if (comment.user && comment.user.toString() !== req.user.id) {
+            await Notification.create({
+                recipient: comment.user,
+                actor: null,
+                type: "comment_deleted",
+                blog: comment.blog,
+            });
+        }
+
         res.json({ success: true, message: "Comment deleted successfully." });
     } catch (error) {
         res.json({ success: false, message: error.message });

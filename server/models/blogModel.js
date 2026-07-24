@@ -17,6 +17,14 @@ const blogSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    tags: {
+      type: [String],
+      default: [],
+    },
+    views: {
+      type: Number,
+      default: 0,
+    },
     image: {
       type: String,
       required: true,

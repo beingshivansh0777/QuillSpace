@@ -8,7 +8,7 @@ import blogRouter from './routes/blogRoutes.js';
 import authRouter from "./routes/authRoutes.js";
 import notificationRouter from "./routes/notificationRoutes.js";
 import reportRouter from "./routes/reportRoutes.js";
-import newsletterRouter from "./routes/newsletterRoutes.js";
+import newsletterRouter from "./routes/newsLetterRoutes.js";
 import ticketRouter from "./routes/ticketRoutes.js";
 import publishScheduledBlogs from "./jobs/publishScheduled.js";
 

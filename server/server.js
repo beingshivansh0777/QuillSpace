@@ -8,7 +8,8 @@ import blogRouter from './routes/blogRoutes.js';
 import authRouter from "./routes/authRoutes.js";
 import notificationRouter from "./routes/notificationRoutes.js";
 import reportRouter from "./routes/reportRoutes.js";
-import newsletterRouter from "./routes/newsLetterRoutes.js";
+import newsletterRouter from "./routes/newsletterRoutes.js";
+import ticketRouter from "./routes/ticketRoutes.js";
 import publishScheduledBlogs from "./jobs/publishScheduled.js";
 
 const app = express();
@@ -28,6 +29,7 @@ app.use('/api/blog',blogRouter)
 app.use("/api/auth", authRouter);
 app.use("/api/notifications", notificationRouter);
 app.use("/api/newsletter", newsletterRouter);
+app.use("/api/tickets", ticketRouter);
 
 // Checks every minute for scheduled blog posts whose time has arrived,
 // and publishes them automatically.

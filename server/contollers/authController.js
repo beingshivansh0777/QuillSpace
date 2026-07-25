@@ -7,6 +7,7 @@ import User from "../models/userModel.js";
 import Blog from "../models/blogModel.js";
 import Comment from "../models/commentModel.js";
 import imagekit from "../configs/imageKit.js";
+import buildEmail from "../utils/emailTemplate.js";
 import resend from "../configs/resend.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -25,17 +26,12 @@ const sendWelcomeEmail = async (user) => {
             from: "QuillSpace <onboarding@resend.dev>",
             to: user.email,
             subject: "Welcome to QuillSpace",
-            html: `
-                <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-                    <h2 style="color: #241F2E;">Welcome, ${user.name}!</h2>
-                    <p style="color: #444;">Your QuillSpace account is ready. Start reading, writing, and connecting with other writers.</p>
-                    <p style="margin: 24px 0;">
-                        <a href="${process.env.CLIENT_URL}" style="background: #5044E5; color: white; padding: 12px 28px; border-radius: 999px; text-decoration: none; font-weight: 600;">
-                            Go to QuillSpace
-                        </a>
-                    </p>
-                </div>
-            `,
+            html: buildEmail({
+                heading: `Welcome, ${user.name}!`,
+                bodyHtml: `<p>Your QuillSpace account is ready. Start reading, writing, and connecting with other writers.</p>`,
+                ctaText: "Go to QuillSpace",
+                ctaUrl: process.env.CLIENT_URL,
+            }),
         });
     } catch (error) {
         console.log("Failed to send welcome email:", error.message);
@@ -49,13 +45,13 @@ const sendPasswordChangedEmail = async (user, context) => {
             from: "QuillSpace <onboarding@resend.dev>",
             to: user.email,
             subject: "Your QuillSpace password was changed",
-            html: `
-                <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-                    <h2 style="color: #241F2E;">Password ${context}</h2>
-                    <p style="color: #444;">This is a confirmation that your QuillSpace account password was just ${context}.</p>
-                    <p style="color: #888; font-size: 13px;">If you didn't do this, reset your password immediately and consider reviewing your account activity.</p>
-                </div>
-            `,
+            html: buildEmail({
+                heading: `Password ${context}`,
+                bodyHtml: `
+                    <p>This is a confirmation that your QuillSpace account password was just ${context}.</p>
+                    <p style="color:#999; font-size:13px; margin-top:16px;">If you didn't do this, reset your password immediately and consider reviewing your account activity.</p>
+                `,
+            }),
         });
     } catch (error) {
         console.log("Failed to send password-changed email:", error.message);
@@ -235,18 +231,15 @@ export const forgotPassword = async (req, res) => {
             from: "QuillSpace <onboarding@resend.dev>",
             to: user.email,
             subject: "Reset your QuillSpace password",
-            html: `
-                <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-                    <h2 style="color: #241F2E;">Reset your password</h2>
-                    <p style="color: #444;">We received a request to reset the password for your QuillSpace account.</p>
-                    <p style="margin: 24px 0;">
-                        <a href="${resetUrl}" style="background: #5044E5; color: white; padding: 12px 28px; border-radius: 999px; text-decoration: none; font-weight: 600;">
-                            Reset Password
-                        </a>
-                    </p>
-                    <p style="color: #888; font-size: 13px;">This link expires in 30 minutes. If you didn't request this, you can safely ignore this email.</p>
-                </div>
-            `,
+            html: buildEmail({
+                heading: "Reset your password",
+                bodyHtml: `
+                    <p>We received a request to reset the password for your QuillSpace account.</p>
+                    <p style="color:#999; font-size:13px; margin-top:16px;">This link expires in 30 minutes. If you didn't request this, you can safely ignore this email.</p>
+                `,
+                ctaText: "Reset Password",
+                ctaUrl: resetUrl,
+            }),
         });
 
         res.json({ success: true, message: genericMessage });

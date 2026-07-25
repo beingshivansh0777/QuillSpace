@@ -86,15 +86,40 @@ export const getAllBlogs = async (req, res) => {
 export const getBlogById = async (req, res) => {
   try {
     const { blogId } = req.params;
-    const blog = await Blog.findByIdAndUpdate(
-      blogId,
-      { $inc: { views: 1 } },
-      { new: true }
-    ).populate("author", "name username");
+    const blog = await Blog.findById(blogId).populate("author", "name username");
     if (!blog) {
       return res.json({ success: false, message: "Blog Not Found!" });
     }
     res.json({ success: true, blog });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// POST /api/blog/track-view/:blogId — optionalAuth (works for logged-in and
+// anonymous readers). Logged-in views are deduped server-side via viewedBy;
+// anonymous views are deduped client-side via localStorage (best-effort —
+// not tamper-proof, but nobody's incentivized to fake blog view counts).
+export const trackBlogView = async (req, res) => {
+  try {
+    const { blogId } = req.params;
+
+    if (req.user) {
+      const alreadyViewed = await Blog.exists({
+        _id: blogId,
+        viewedBy: req.user.id,
+      });
+      if (!alreadyViewed) {
+        await Blog.findByIdAndUpdate(blogId, {
+          $addToSet: { viewedBy: req.user.id },
+          $inc: { views: 1 },
+        });
+      }
+    } else {
+      await Blog.findByIdAndUpdate(blogId, { $inc: { views: 1 } });
+    }
+
+    res.json({ success: true });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }

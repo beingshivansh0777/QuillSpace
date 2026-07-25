@@ -17,10 +17,12 @@ import {
   publishOwnBlog,
   updateBlog,
   voteBlog,
+  trackBlogView,
 } from "../contollers/blogController.js";
 import upload from "../middleware/multer.js";
 import auth from "../middleware/auth.js";
 import adminAuth from "../middleware/adminAuth.js";
+import optionalAuth from "../middleware/optionalAuth.js";
 
 const blogRouter = express.Router();
 
@@ -29,6 +31,7 @@ blogRouter.get("/all", getAllBlogs);
 blogRouter.get("/mine", auth, getMyBlogs);
 blogRouter.get("/bookmarks", auth, getBookmarkedBlogs);
 blogRouter.get("/bookmark-status/:blogId", auth, getBookmarkStatus);
+blogRouter.post("/track-view/:blogId", optionalAuth, trackBlogView);
 blogRouter.get("/:blogId", getBlogById);                              // keep below the literal paths above
 blogRouter.post("/delete", adminAuth, deleteBlogById);                // admin — any post
 blogRouter.post("/delete-own", auth, deleteOwnBlog);

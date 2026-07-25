@@ -10,7 +10,7 @@ import toast from "react-hot-toast";
 import { FaWhatsapp, FaFacebook, FaInstagram, FaLink, FaThumbsUp, FaThumbsDown } from "react-icons/fa";
 import { FaRegBookmark, FaBookmark, FaRegHeart, FaHeart } from "react-icons/fa6";
 import { HiOutlineFlag } from "react-icons/hi";
-import ReportModal from "../components/ReportModel";
+import ReportModal from "../components/ReportModel.jsx";
 
 const Blog = () => {
   const { id } = useParams();
@@ -206,6 +206,16 @@ const Blog = () => {
       axios.get(`/api/blog/bookmark-status/${id}`).then(({ data }) => {
         if (data.success) setBookmarked(data.bookmarked);
       }).catch(() => {});
+    }
+
+    // Track the view once. Logged-in reads are deduped server-side; for
+    // anonymous readers we guard with localStorage so refreshing the same
+    // browser doesn't keep inflating the count.
+    const viewedKey = `viewed_${id}`;
+    const shouldTrack = token || !localStorage.getItem(viewedKey);
+    if (shouldTrack) {
+      axios.post(`/api/blog/track-view/${id}`).catch(() => {});
+      if (!token) localStorage.setItem(viewedKey, "1");
     }
   }, [token, user]);
 

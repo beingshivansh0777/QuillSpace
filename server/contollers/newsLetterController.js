@@ -1,5 +1,6 @@
 import Subscriber from "../models/subscriberModel.js";
 import resend from "../configs/resend.js";
+import buildEmail from "../utils/emailTemplate.js";
 
 // POST /api/newsletter/subscribe — public, no auth
 export const subscribe = async (req, res) => {
@@ -22,12 +23,10 @@ export const subscribe = async (req, res) => {
         from: "QuillSpace <onboarding@resend.dev>",
         to: email,
         subject: "You're subscribed to QuillSpace",
-        html: `
-          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2 style="color: #241F2E;">You're in!</h2>
-            <p style="color: #444;">Thanks for subscribing to QuillSpace. We'll let you know when there's something worth reading.</p>
-          </div>
-        `,
+        html: buildEmail({
+          heading: "You're in!",
+          bodyHtml: `<p>Thanks for subscribing to QuillSpace. We'll let you know when there's something worth reading.</p>`,
+        }),
       });
     } catch (emailError) {
       console.log("Failed to send subscription confirmation email:", emailError.message);

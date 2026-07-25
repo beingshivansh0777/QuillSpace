@@ -14,8 +14,22 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["blog_comment", "comment_like", "schedule_published", "blog_deleted", "comment_deleted"],
+      enum: [
+        "blog_comment",
+        "comment_like",
+        "schedule_published",
+        "blog_deleted",
+        "comment_deleted",
+        "new_ticket",
+        "ticket_reply",
+        "ticket_status_changed",
+      ],
       required: true,
+    },
+    ticket: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SupportTicket",
+      default: null,
     },
     blog: {
       type: mongoose.Schema.Types.ObjectId,

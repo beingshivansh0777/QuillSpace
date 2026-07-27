@@ -1,0 +1,106 @@
+name: CI/CD
+
+# Runs on every push to main. Each job only runs if the one before it
+# succeeds — that's what "gates" deployment behind CI passing.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Stage 1: Build & Validate
+  # Catches structural problems — broken imports, syntax errors, missing
+  # files, case-sensitivity mismatches — before anything gets deployed.
+  # ---------------------------------------------------------------------
+  build-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install backend dependencies
+        working-directory: ./server
+        run: npm ci
+
+      - name: Syntax-check every backend file
+        working-directory: ./server
+        run: |
+          find . -name "*.js" -not -path "./node_modules/*" -print0 | \
+          xargs -0 -n1 node --check
+
+      - name: Install frontend dependencies
+        working-directory: ./client
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ./client
+        env:
+          VITE_BASE_URL: ${{ secrets.PRODUCTION_API_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+        run: npm run build
+
+      - name: Build backend Docker image
+        run: docker build -t quillspace-server-test ./server
+
+      - name: Build frontend Docker image
+        run: |
+          docker build \
+            --build-arg VITE_BASE_URL=${{ secrets.PRODUCTION_API_URL }} \
+            --build-arg VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }} \
+            -t quillspace-client-test ./client
+
+  # ---------------------------------------------------------------------
+  # Stage 2: Deploy
+  # Only runs if build-and-validate succeeded. Triggers Render and Vercel
+  # via their Deploy Hooks, instead of relying on their own auto-deploy —
+  # this is what actually gates deployment behind CI passing.
+  # ---------------------------------------------------------------------
+  deploy:
+    needs: build-and-validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy (backend)
+        run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
+      - name: Trigger Vercel deploy (frontend)
+        run: curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}"
+
+  # ---------------------------------------------------------------------
+  # Stage 3: Smoke Test
+  # Only runs if deploy succeeded. Waits for the deploy to likely finish,
+  # then checks that production is actually responding correctly. This is
+  # the safety net standing in for "a human manually checking before
+  # trusting the deploy."
+  # ---------------------------------------------------------------------
+  smoke-test:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for deploy to finish
+        # Render deploy hooks trigger asynchronously — there's no instant
+        # "done" signal to poll here without more infrastructure. This is
+        # a pragmatic fixed wait, not a perfectly precise one.
+        run: sleep 90
+
+      - name: Check /api/health
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.PRODUCTION_API_URL }}/api/health")
+          if [ "$response" != "200" ]; then
+            echo "Health check failed with status $response"
+            exit 1
+          fi
+          echo "Health check passed."
+
+      - name: Check /api/blog/all responds correctly
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.PRODUCTION_API_URL }}/api/blog/all")
+          if [ "$response" != "200" ]; then
+            echo "Blog listing endpoint failed with status $response"
+            exit 1
+          fi
+          echo "Blog listing check passed."

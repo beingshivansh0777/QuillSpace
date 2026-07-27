@@ -1,0 +1,23 @@
+services:
+  server:
+    build: ./server
+    ports:
+      - "4000:3000"
+    env_file:
+      - ./server/.env
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ./client
+      args:
+        # These get baked into the compiled JS at build time — see the
+        # note in client/Dockerfile about why this differs from the
+        # backend's runtime env_file approach.
+        VITE_BASE_URL: http://localhost:4000
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+    restart: unless-stopped

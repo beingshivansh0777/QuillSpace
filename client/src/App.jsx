@@ -14,6 +14,9 @@ import Dashboard from './pages/admin/Dashboard.jsx'
 import ListBlog from './pages/admin/ListBlog.jsx'
 import Comments from './pages/admin/Comments.jsx'
 import Reports from './pages/admin/Reports.jsx'
+import Tickets from './pages/admin/Ticket.jsx'
+import SupportPage from './pages/SupportPage.jsx'
+import TicketThread from './pages/TicketThread.jsx'
 import Login from './components/admin/Login.jsx'
 
 import 'quill/dist/quill.snow.css'
@@ -38,11 +41,15 @@ const App = () => {
         <Route path="/edit/:id" element={<EditBlog/>} />
         <Route path="/profile" element={<MyProfile/>} />
         <Route path="/user/:username" element={<PublicProfile/>} />
+        <Route path="/support" element={<SupportPage/>} />
+        <Route path="/support/:id" element={<TicketThread/>} />
+        <Route path="/admin/tickets/:id" element={<TicketThread/>} />
         <Route path='/admin' element={token ? <Layout/> : <Login/>}>
            <Route index element={<Dashboard/>}/>
             <Route path='listBlog' element={<ListBlog/>}/>
              <Route path='comments' element={<Comments/>}/>
              <Route path='reports' element={<Reports/>}/>
+             <Route path='tickets' element={<Tickets/>}/>
         </Route>
        </Routes>
       

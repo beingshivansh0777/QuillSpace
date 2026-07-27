@@ -5,7 +5,7 @@ import Moment from "moment";
 import { useAppContext } from "../context/AppContext";
 
 const NotificationBell = () => {
-  const { axios, token } = useAppContext();
+  const { axios, token, user } = useAppContext();
   const navigate = useNavigate();
 
   const [notifications, setNotifications] = useState([]);
@@ -53,7 +53,11 @@ const NotificationBell = () => {
       // ignore
     }
     setShowDropdown(false);
-    if (notif.blog?._id) navigate(`/blog/${notif.blog._id}`);
+    if (notif.ticket) {
+      navigate(user?.role === "admin" ? `/admin/tickets/${notif.ticket}` : `/support/${notif.ticket}`);
+    } else if (notif.blog?._id) {
+      navigate(`/blog/${notif.blog._id}`);
+    }
   };
 
   const handleMarkAllRead = async () => {
@@ -83,6 +87,15 @@ const NotificationBell = () => {
     if (notif.type === "comment_deleted") {
       return `Your comment on "${notif.blog?.title || "a post"}" was deleted by an admin.`;
     }
+    if (notif.type === "new_ticket") {
+      return "A new support ticket was submitted.";
+    }
+    if (notif.type === "ticket_reply") {
+      return `New reply on a support ticket.`;
+    }
+    if (notif.type === "ticket_status_changed") {
+      return "Your support ticket status was updated.";
+    }
     return "New notification";
   };
 
@@ -97,7 +110,7 @@ const NotificationBell = () => {
       >
         <HiOutlineBell size={22} className="text-[#241F2E]/70" />
         {unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
+          <span className="absolute top-1.5 right-1.5 min-w-4px h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -155,7 +168,7 @@ const NotificationBell = () => {
                     </p>
                   </div>
                   {!notif.isRead && (
-                    <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5" />
+                    <span className="w-2 h-2 rounded-full bg-primary -shrink-0 mt-1.5" />
                   )}
                 </div>
               </button>

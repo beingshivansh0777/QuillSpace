@@ -1,13 +1,12 @@
 import Blog from "../models/blogModel.js";
 import Notification from "../models/notificationModel.js";
+import logger from "../configs/logger.js";
 
 // Publishes any post whose scheduled time has arrived, and notifies its
 // author. Runs on a timer (wired up in server.js via node-cron) rather
 // than being triggered by any request.
 const publishScheduledBlogs = async () => {
   try {
-    // Find matching posts FIRST — updateMany alone wouldn't tell us which
-    // specific blogs/authors to notify afterward.
     const dueBlogs = await Blog.find({
       isPublished: false,
       scheduledFor: { $ne: null, $lte: new Date() },
@@ -34,9 +33,9 @@ const publishScheduledBlogs = async () => {
       }))
     );
 
-    console.log(`[scheduler] Published ${dueBlogs.length} scheduled blog(s).`);
+    logger.info(`Published ${dueBlogs.length} scheduled blog(s).`);
   } catch (error) {
-    console.log("[scheduler] Failed to publish scheduled blogs:", error.message);
+    logger.error({ err: error }, "Failed to publish scheduled blogs");
   }
 };
 

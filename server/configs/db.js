@@ -1,19 +1,20 @@
 import mongoose from "mongoose";
+import logger from "./logger.js";
 
 const connectDB = async () => {
   try {
     mongoose.connection.on("connected", () =>
-      console.log("Database Connected")
+      logger.info("Database Connected")
     );
     mongoose.connection.on("error", (err) =>
-      console.log("Database connection error:", err.message)
+      logger.error({ err }, "Database connection error")
     );
 
     await mongoose.connect(`${process.env.MONGODB_URI}/quillspace`, {
-      serverSelectionTimeoutMS: 10000, 
+      serverSelectionTimeoutMS: 10000,
     });
   } catch (error) {
-    console.log("Failed to connect to DB:", error.message);
+    logger.error({ err: error }, "Failed to connect to DB");
   }
 };
 

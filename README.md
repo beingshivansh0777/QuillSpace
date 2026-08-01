@@ -1,8 +1,31 @@
-# 📝 QuillSpace
+# 🪶 QuillSpace
 
-QuillSpace is a full-stack blogging platform where anyone can read blogs publicly, registered users can write and publish their own posts (instantly, as drafts, or scheduled for later), interact through comments/likes/bookmarks, and admins moderate content through a dedicated analytics-driven dashboard.
+A full-stack blogging platform built with the MERN stack — writers publish, readers engage, admins moderate, and the whole thing runs in Docker with a CI/CD pipeline behind it.
 
-Built with **React (Vite) + Tailwind CSS** on the frontend and **Node.js + Express + MongoDB** on the backend.
+---
+
+## 🛠️ Tech Stack
+
+**Frontend:**  React (Vite) ·  Tailwind CSS v4 ·  React Router ·  Axios ·  Quill (rich text editor) ·  Recharts ·  React Hot Toast
+
+**Backend:**  Node.js ·  Express ·  MongoDB (Mongoose) ·  JWT authentication ·  bcryptjs ·  Multer ·  node-cron
+
+**Third-party services:**
+- 🖼️ **ImageKit** — image hosting/optimization (blog thumbnails, profile photos, ticket screenshots)
+- 🤖 **Google Gemini API** — AI-assisted blog content generation
+- 🔑 **Google OAuth** — Sign in with Google
+- 📧 **Resend** — transactional email (welcome, password reset/change, newsletter, ticket notifications)
+
+**Production & DevOps:**
+-  **Helmet** — security HTTP headers
+-  **express-rate-limit** — tiered rate limiting (general, auth, AI generation)
+-  **Compression** — gzip response compression
+-  **Zod** — request validation middleware
+-  **Pino** — structured logging + request logging
+-  **Swagger (OpenAPI)** — interactive API documentation
+-  **Docker + Docker Compose** — containerized frontend (Nginx) and backend
+-  **GitHub Actions** — CI/CD pipeline (build validation → deploy → smoke test)
+-  **AWS EC2** — self-managed deployment target (alongside Render/Vercel)
 
 ---
 
@@ -10,273 +33,228 @@ Built with **React (Vite) + Tailwind CSS** on the frontend and **Node.js + Expre
 
 ### 🔐 Authentication
 - Email/password registration & login
-- Google Sign-In (login & register modes, respects which tab you're on)
-- JWT-based sessions, persisted across page refreshes
-- Forgot Password — email reset link via Resend
-- Reset Password — in-app, for logged-in users (with "set a password" flow for Google-only accounts)
+- Google Sign-In (login and register modes handled separately)
+- JWT-based sessions, persisted across refreshes
+- Welcome email on registration
+- Forgot Password — email reset link, 30-minute expiring token
+- Reset/Change Password — from within the app, with a confirmation email either way
+- Self-service account deletion, with cascade cleanup of the user's own content
 
-### 🛡️ Roles & Admin
-- User vs Admin roles, enforced server-side (never trusts the client)
-- Admin seed script (`createAdmin.js`) + a protected promote-to-admin endpoint
-- Admin Analytics Dashboard — total users, total blogs, total comments, published vs unpublished
-- Charts: monthly blog publishing trend, monthly user registrations, blogs by category
-- Admin Blog List — moderate/delete any post
-- Admin Comments — moderate/delete any comment (cascades to replies)
+### 👑 Roles & Admin
+- `user` / `admin` roles, enforced entirely server-side (never trusted from client input)
+- One-time local seed script (`createAdmin.js`) creates the first admin
+- Existing admins can promote other users to admin
+- 📊 **Analytics Dashboard** — total users, blogs, comments, published/unpublished counts, plus monthly blog-publishing, monthly user-registration, and blogs-by-category charts
+- Blog moderation (delete any post, author notified)
+- Comment moderation (delete any comment, cascades to replies, commenter notified)
 
-### 📰 Blog Writing & Publishing
-- Any logged-in user can write a blog (not admin-only)
-- AI-assisted content generation (Google Gemini)
-- Three publish modes: **Publish Now**, **Save as Draft**, **Schedule for Later**
-- Scheduled posts auto-publish via a cron job that runs every minute
-- 30-minute edit window after a post goes live (drafts/scheduled posts are editable anytime)
-- Authors can delete their own posts anytime; admins can delete any post
-- Real author tracking + byline on every post, linking to the author's public profile
+### ✍️ Writing & Publishing
+- Any logged-in user can write and publish blog posts
+- 🤖 AI-assisted content generation (Gemini), rate-limited to prevent abuse
+- Three publishing modes: 🟢 **Publish now** · 📝 **Save as draft** · ⏰ **Schedule for later** (auto-published via a cron job that checks every minute)
+- 🏷️ Tags (up to 10 per post) alongside categories
+- 30-minute edit window after publishing; drafts/scheduled posts are editable with no time limit
+- Authors can delete their own posts anytime, or manually publish a draft/scheduled post early
 
 ### 📖 Reading Experience
-- Public blog listing with category filtering + search — no login required
+- Public feed with category filtering and search
 - Responsive blog cards across phone/tablet/laptop
-- Editorial-styled blog detail page
-- Like / dislike voting — per-user tracked server-side, requires login
-- Share to WhatsApp, Facebook, Instagram (native share sheet fallback), or copy link
+-  Real, deduplicated view counts — server-side tracking for logged-in users, browser-based dedup for anonymous readers
+-  Per-user like/dislike voting (mutually exclusive, requires login)
+-  Share to WhatsApp, Facebook, Instagram (native share sheet fallback), or copy link
 
 ### 💬 Comments
-- Live comment posting — no admin approval delay
+- Post live instantly, no approval delay
 - One level of nested replies
-- Like comments and replies
-- Admin can delete any comment (removes its replies too)
+-  Like comments and replies
+-  Report/flag a comment for admin review
 
 ### 🔖 Bookmarks
-- Save/unsave any blog post
+- Save/unsave any post
 - Dedicated "Saved Blogs" tab in the user's profile
 
+### 🚨 Content Moderation
+- Users can report blogs or comments (with a reason) for admin review
+- Admin Reports queue: dismiss, or delete the content outright (which also notifies the content's owner)
+
 ### 👤 Profile
-- Username + bio, shown on a public profile page (`/user/:username`)
-- Profile photo upload via ImageKit, auto-cropped square
-- "My Posts" tab — see status (draft/scheduled/published), edit, delete, or publish early
-- Password reset directly from the profile menu
+- Username, bio, and profile photo (auto-cropped via ImageKit)
+- Public profile pages at `/user/:username`
+- "My Posts" tab — status (Draft/Scheduled/Published), inline analytics per post (views, likes, dislikes, comment count), edit/delete/publish-now actions
+- ⚠️ Danger Zone: self-service account deletion with password (or typed) confirmation
 
 ### 🔔 Notifications
-- Bell icon with unread badge, auto-polling
-- Notified when someone comments on your blog
-- Notified when someone likes your comment
-- Notified when your scheduled post auto-publishes
+- Bell icon with a live unread count (polls every 30 seconds)
+- Triggers: someone comments on your blog, someone likes your comment, your scheduled post auto-publishes, an admin deletes your content, a support ticket gets a reply or status change
 
-### 🎨 Design System
-- Editorial identity — ink/paper palette, serif headlines (Instrument Serif), monospace labels (JetBrains Mono)
-- Consistent styling across Login, Home, Blog listing, and Blog detail pages
-- Fully responsive across phone, tablet, and laptop breakpoints
+### 🎫 Customer Support
+- Users can open support tickets (category, description, optional screenshot)
+- Threaded conversation per ticket between the user and admins
+- Admin can change ticket status (🟡 Open / 🔵 In Progress / 🟢 Resolved / ⚪ Closed)
+- A user reply automatically reopens a resolved/closed ticket
+- Email notifications on ticket creation and admin replies
 
----
+### 📬 Newsletter
+- Real subscribe form, stored in the database, with a confirmation email
 
-## 🧱 Tech Stack
-
-| Layer          | Technology                                      |
-|----------------|--------------------------------------------------|
-| Frontend       | React (Vite), React Router, Tailwind CSS, Axios |
-| Backend        | Node.js, Express                                |
-| Database       | MongoDB (Mongoose)                              |
-| Auth           | JWT, bcryptjs, Google OAuth (`@react-oauth/google`, `google-auth-library`) |
-| Image Storage  | ImageKit                                        |
-| AI Content     | Google Gemini API                               |
-| Email          | Resend                                          |
-| Scheduling     | node-cron                                       |
-| Charts         | Recharts                                        |
+### 🎨 Design
+- Custom editorial identity — ink/paper palette, serif display headlines, monospace field labels
+- Fully responsive, phone through laptop
 
 ---
 
-## 📁 Project Structure
+## 🛡️ Production Hardening
+
+-  **Helmet** — sets security-related HTTP headers by default
+-  **Compression** — gzips API responses
+-  **Rate limiting**, tiered:
+  - General baseline across all routes (300 req / 15 min)
+  - Strict limit on login/register/forgot-password (10 req / 15 min) — brute-force protection
+  - Strict limit on AI content generation (15 req / 15 min) — cost protection
+-  **Request validation** (Zod) — runs before the controller on the highest-risk routes, rejecting bad input with a consistent error shape
+-  **Structured logging** (Pino) — pretty-printed in development, JSON in production; automatic request logging via `pino-http`
+-  **Health check** — `GET /api/health` returns DB connection status and process uptime, placed outside the rate limiter so monitoring tools are never throttled
+-  **API Documentation** — interactive Swagger UI at `/api-docs`
+
+---
+
+## 📂 Project Structure
 
 ```
 QuillSpace/
-├── client/                          # React frontend (Vite)
-│   ├── index.html
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── vercel.json                  # Vercel deployment config
-│   ├── eslint.config.js
-│   ├── public/
-│   │   ├── title.jpeg
-│   │   └── vite.svg
+├── 🐳 docker-compose.yml
+├── 🔑 .env
+├── ⚙️ .github/workflows/ci-cd.yml
+├── 💻 client/                     # React frontend (Vite)
+│   ├── Dockerfile                 # Multi-stage: build with Node, serve with Nginx
+│   ├── nginx.conf                 # SPA routing fallback for React Router
 │   └── src/
-│       ├── main.jsx
-│       ├── App.jsx
-│       ├── App.css
-│       ├── index.css
-│       ├── assets/                  # icons, logos, sample blog images, assets.js
-│       ├── context/
-│       │   └── AppContext.jsx       # global state: auth, token, user, blogs, axios instance
+│       ├── pages/
 │       ├── components/
-│       │   ├── Navbar.jsx
-│       │   ├── Header.jsx
-│       │   ├── BlogCard.jsx
-│       │   ├── BlogList.jsx
-│       │   ├── NewsLetter.jsx
-│       │   ├── Footer.jsx
-│       │   ├── Loader.jsx
-│       │   ├── EditProfileModal.jsx
-│       │   ├── ResetPasswordModal.jsx
-│       │   ├── NotificationBell.jsx
-│       │   └── admin/
-│       │       ├── Login.jsx
-│       │       ├── Sidebar.jsx
-│       │       ├── BlogTableItem.jsx
-│       │       └── CommentTableItem.jsx
-│       └── pages/
-│           ├── Home.jsx
-│           ├── Blog.jsx                 # blog detail: comments, votes, bookmark, share
-│           ├── WriteBlog.jsx            # publish now / draft / schedule
-│           ├── EditBlog.jsx             # 30-minute edit window enforced
-│           ├── MyProfile.jsx            # My Posts + Saved Blogs tabs
-│           ├── PublicProfile.jsx        # /user/:username
-│           ├── ForgetPassword.jsx
-│           ├── ResetPassword.jsx
-│           └── admin/
-│               ├── Layout.jsx
-│               ├── Dashboard.jsx        # analytics + charts
-│               ├── ListBlog.jsx
-│               └── Comments.jsx
-│
-└── server/                          # Express backend
-    ├── server.js                    # app entry point, route mounting, cron wiring
-    ├── createAdmin.js                # one-time admin seed script
-    ├── package.json
-    ├── vercel.json                   # Render/Vercel deployment config
-    ├── configs/
-    │   ├── db.js                     # MongoDB connection
-    │   ├── imageKit.js                # image upload config
-    │   ├── gemini.js                  # AI content generation config
-    │   └── resend.js                  # transactional email config
-    ├── models/
-    │   ├── userModel.js               # username, bio, avatar, bookmarks, role, resetToken
-    │   ├── blogModel.js                # author, isPublished, scheduledFor, likedBy/dislikedBy
-    │   ├── commentModel.js             # user, parent (for replies), likes
-    │   └── notificationModel.js
-    ├── contollers/
-    │   ├── authController.js          # register, login, Google auth, profile, password flows
-    │   ├── blogController.js          # CRUD, publishing modes, voting, comments, bookmarks
-    │   ├── adminController.js          # dashboard analytics, moderation, promote-to-admin
-    │   └── notificationController.js
+│       ├── context/                # AppContext — global auth/user/blog state
+│       └── assets/
+└── 🚂 server/                     # Express backend
+    ├── Dockerfile
+    ├── configs/                    # DB, ImageKit, Gemini, Resend, logger, Swagger
+    ├── contollers/                  # Route logic
+    ├── middleware/                  # auth, adminAuth, optionalAuth, multer, rateLimiters, validate
+    ├── models/                     # Mongoose schemas
     ├── routes/
-    │   ├── authRoutes.js
-    │   ├── blogRoutes.js
-    │   ├── adminRoutes.js
-    │   └── notificationRoutes.js
-    ├── middleware/
-    │   ├── auth.js                    # any logged-in user
-    │   ├── adminAuth.js                # admin-only
-    │   └── multer.js                   # file upload handling
-    └── jobs/
-        └── publishScheduled.js         # cron job: auto-publishes scheduled posts every minute
+    ├── validators/                 # Zod schemas
+    ├── jobs/                       # Scheduled post publishing (cron)
+    └── utils/                      # Shared email template
 ```
 
 ---
 
-## ⚙️ Installation & Setup
+## 🚀 Local Installation (without Docker)
 
-### Prerequisites
-- Node.js (v18+ recommended)
-- A MongoDB Atlas cluster (or local MongoDB instance)
-- Accounts/API keys for: ImageKit, Google Gemini, Google Cloud (OAuth), Resend
+### ✅ Prerequisites
+- Node.js (v18+)
+- A MongoDB database (MongoDB Atlas recommended)
+- Accounts for: ImageKit, Google Cloud Console (OAuth), Google AI Studio (Gemini), Resend
 
-### 1. Clone the repository
+### 1️⃣ Clone and install dependencies
+
 ```bash
 git clone <your-repo-url>
 cd QuillSpace
+cd server && npm install
+cd ../client && npm install
 ```
 
-> **Tip:** avoid keeping the project inside `~/Desktop` or `~/Documents` on macOS if iCloud Drive sync is enabled — it can cause random file-read crashes in Node during development. Keep it somewhere like `~/Developer` instead.
+### 2️⃣ Environment variables
 
-### 2. Backend setup
-```bash
-cd server
-npm install
+**`server/.env`**
 ```
-
-Create a `server/.env` file:
-```env
 JWT_SECRET=your_jwt_secret
+MONGODB_URI=your_mongodb_connection_string
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=your_admin_password
-
-MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net
-
 IMAGEKIT_PUBLIC_KEY=your_imagekit_public_key
 IMAGEKIT_PRIVATE_KEY=your_imagekit_private_key
-IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/your_id
-
+IMAGEKIT_URL_ENDPOINT=your_imagekit_url_endpoint
 GEMINI_API_KEY=your_gemini_api_key
-
 GOOGLE_CLIENT_ID=your_google_oauth_client_id
-
 RESEND_API_KEY=your_resend_api_key
 CLIENT_URL=http://localhost:5173
 ```
 
-⚠️ **.env formatting rules that matter:**
-- No spaces around `=`
-- No quotes around values
-- No trailing semicolons
-- No duplicate keys
-
-Seed your first admin account:
-```bash
-node createAdmin.js
+**`client/.env`**
 ```
-
-Start the backend:
-```bash
-npm run server
-```
-
-### 3. Frontend setup
-```bash
-cd ../client
-npm install
-```
-
-Create a `client/.env` file:
-```env
 VITE_BASE_URL=http://localhost:3000
 VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id
 ```
 
-Start the frontend:
+> ⚠️ No spaces around `=`, no quotes around values. Never commit `.env` files.
+
+### 3️⃣ Create your first admin
+
 ```bash
-npm run dev
+cd server
+node createAdmin.js
 ```
 
-The app will be available at `http://localhost:5173`, talking to the backend at `http://localhost:3000`.
+### 4️⃣ Run the app
 
-### 4. Google OAuth setup (for Google Sign-In)
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create/select a project → configure the **OAuth consent screen** (set the App name correctly — this is what users see in the sign-in popup)
-3. **Credentials → Create Credentials → OAuth Client ID** (Web application)
-4. Add `http://localhost:5173` under **Authorized JavaScript origins**
-5. Copy the Client ID into both `.env` files as shown above
+```bash
+# Terminal 1 — backend
+cd server && npm run server
 
-### 5. Resend setup (for password reset emails)
-1. Sign up at [resend.com](https://resend.com)
-2. **API Keys → Create API Key** → copy it into `server/.env`
-3. Note: until you verify a custom domain, Resend's free tier only delivers to the email address you signed up with
+# Terminal 2 — frontend
+cd client && npm run dev
+```
+
+🌐 Visit `http://localhost:5173` · 📖 API docs at `http://localhost:3000/api-docs`
 
 ---
 
-## 🔑 Default Admin Access
+## 🐳 Running with Docker
 
-After running `node createAdmin.js`, log in with the `ADMIN_EMAIL` / `ADMIN_PASSWORD` you set in `server/.env` to access `/admin`.
-
-To promote another existing user to admin:
+```bash
+cd QuillSpace
+docker compose up -d --build
 ```
-PATCH /api/admin/promote/:userId
-Authorization: Bearer <admin_token>
+
+- 💻 Frontend → `http://localhost:5173`
+- 🚂 Backend → `http://localhost:3000` (or whatever host port is configured in `docker-compose.yml`)
+
+```bash
+docker compose ps        # ✅ check container status
+docker compose logs -f   # 📜 follow logs
+docker compose down      # 🛑 stop and remove containers
 ```
 
 ---
 
-## 🚀 Deployment Notes
+## ⚙️ CI/CD
 
-- **Frontend:** Vercel (or similar) — set `VITE_BASE_URL` and `VITE_GOOGLE_CLIENT_ID` as environment variables in the platform dashboard
-- **Backend:** Render (or similar) — set every variable from `server/.env` in the platform's Environment tab (local `.env` files are never deployed automatically)
-- **MongoDB Atlas:** under Network Access, allow `0.0.0.0/0` since most hosts (Render, Vercel) use dynamic outbound IPs
-- **Scheduled posts on free-tier hosting:** Render's free tier spins the server down when idle. A post scheduled to publish while the server is asleep won't go live until the next incoming request wakes it up — consider an uptime-ping service or a paid tier if exact-time publishing matters for your use case.
+GitHub Actions (`.github/workflows/ci-cd.yml`) runs on every push to `main`:
 
+1. 🔨 **Build & Validate** — installs dependencies, syntax-checks the backend, builds the frontend, builds both Docker images. Any failure stops the pipeline before anything deploys.
+2. 🚀 **Deploy** — triggers Render (backend) and Vercel (frontend) via their Deploy Hooks, gated behind step 1 passing.
+3. 🩺 **Smoke Test** — checks `/api/health` and `/api/blog/all` on the live site after deployment. A failure surfaces immediately in GitHub; rollback is currently a manual dashboard action, not automatic.
+
+🔒 Required GitHub repository secrets: `RENDER_DEPLOY_HOOK_URL`, `VERCEL_DEPLOY_HOOK_URL`, `PRODUCTION_API_URL`, `VITE_GOOGLE_CLIENT_ID`.
+
+---
+
+## ☁️ Deployment
+
+**Current setup:** Render (backend) + Vercel (frontend), with an AWS EC2 instance running the same Dockerized stack in parallel for testing/learning purposes.
+
+- **Render** — environment variables set directly in the dashboard; MongoDB Atlas Network Access allows `0.0.0.0/0`.
+- **Vercel** — runs its own build step before deploying, acting as an independent build gate.
+- **AWS EC2** — Ubuntu instance running Docker + Docker Compose directly, using the same Dockerfiles as local dev. Currently accessed via public IP (no domain/HTTPS yet); Google Sign-In requires each tested origin to be added in Google Cloud Console.
+
+---
+
+## 📌 Notes on Third-Party Setup
+
+- 🔑 **Google OAuth** — add every origin you test from as an Authorized JavaScript origin.
+- 📧 **Resend** — free tier only sends to your own signup email until a domain is verified.
+- ⏰ **Scheduled posts** — cron checks every minute; on hosts that spin down when idle, publishing happens on the next incoming request after the scheduled time.
+
+---
+
+<p align="center">Made with 🩷 by writers, for writers — <b>QuillSpace</b></p>

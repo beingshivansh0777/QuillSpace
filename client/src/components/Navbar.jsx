@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import Logo from "../assets/logo.jpeg";
+import Logo from "../assets/navbarlogo.png";
 import { assets } from "../assets/assets";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../context/AppContext";

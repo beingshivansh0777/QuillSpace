@@ -1,7 +1,8 @@
-import Report from "../models/reportModel.js";
 import Blog from "../models/blogModel.js";
 import Comment from "../models/commentModel.js";
 import Notification from "../models/notificationModel.js";
+import Report from "../models/reportModel.js";
+
 
 // POST /api/reports — any logged-in user can flag a blog or comment
 export const createReport = async (req, res) => {
@@ -16,7 +17,7 @@ export const createReport = async (req, res) => {
     }
 
     const existing = await Report.findOne({
-      reporter: req.user.id, 
+      reporter: req.user.id,
       targetType,
       targetId,
       status: "pending",
@@ -41,10 +42,19 @@ export const createReport = async (req, res) => {
 // GET /api/admin/reports — admin only, pending reports with target content attached
 export const getReports = async (req, res) => {
   try {
-    const reports = await Report.find({ status: "pending" })
-      .populate("reporter", "name email")
-      .sort({ createdAt: -1 })
-      .lean();
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [totalCount, reports] = await Promise.all([
+      Report.countDocuments({ status: "pending" }),
+      Report.find({ status: "pending" })
+        .populate("reporter", "name email")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+    ]);
 
     // targetId is polymorphic (blog or comment) — fetch each target manually
     // since a single populate() can't follow two different collections.
@@ -67,7 +77,13 @@ export const getReports = async (req, res) => {
           : commentMap[r.targetId.toString()] || null,
     }));
 
-    res.json({ success: true, reports: enriched });
+    res.json({
+      success: true,
+      reports: enriched,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+      totalCount,
+    });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }

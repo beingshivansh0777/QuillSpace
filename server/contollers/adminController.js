@@ -4,7 +4,6 @@ import User from "../models/userModel.js";
 import Notification from "../models/notificationModel.js";
 
 
-
 // PATCH /api/admin/promote/:userId
 // Protected by adminAuth in adminRoutes.js — only an existing admin can call this.
 export const promoteToAdmin = async (req, res) => {
@@ -31,8 +30,22 @@ export const promoteToAdmin = async (req, res) => {
 
 export const getAllBlogsAdmin = async (req, res) => {
     try {
-        const blogs = await Blog.find({}).sort({ createdAt: -1 });
-        res.json({ success: true, blogs });
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+        const skip = (page - 1) * limit;
+
+        const [totalCount, blogs] = await Promise.all([
+            Blog.countDocuments({}),
+            Blog.find({}).sort({ createdAt: -1 }).skip(skip).limit(limit),
+        ]);
+
+        res.json({
+            success: true,
+            blogs,
+            currentPage: page,
+            totalPages: Math.ceil(totalCount / limit),
+            totalCount,
+        });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -42,11 +55,27 @@ export const getAllBlogsAdmin = async (req, res) => {
 // for moderation. The only action available now is Delete.
 export const getAllComments = async (req, res) => {
     try {
-        const comments = await Comment.find({})
-            .populate("blog", "title")
-            .populate("user", "name username")
-            .sort({ createdAt: -1 });
-        res.json({ success: true, comments });
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+        const skip = (page - 1) * limit;
+
+        const [totalCount, comments] = await Promise.all([
+            Comment.countDocuments({}),
+            Comment.find({})
+                .populate("blog", "title")
+                .populate("user", "name username")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+        ]);
+
+        res.json({
+            success: true,
+            comments,
+            currentPage: page,
+            totalPages: Math.ceil(totalCount / limit),
+            totalCount,
+        });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }

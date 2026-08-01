@@ -1,15 +1,30 @@
 import Notification from "../models/notificationModel.js";
 
-// GET /api/notifications — most recent 30 for the logged-in user
+// GET /api/notifications — paginated, most recent first
 export const getNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find({ recipient: req.user.id })
-      .populate("actor", "name username avatar")
-      .populate("blog", "title")
-      .sort({ createdAt: -1 })
-      .limit(30);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
 
-    res.json({ success: true, notifications });
+    const [totalCount, notifications] = await Promise.all([
+      Notification.countDocuments({ recipient: req.user.id }),
+      Notification.find({ recipient: req.user.id })
+        .populate("actor", "name username avatar")
+        .populate("blog", "title")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+    ]);
+
+    res.json({
+      success: true,
+      notifications,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+      totalCount,
+      hasMore: skip + notifications.length < totalCount,
+    });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }

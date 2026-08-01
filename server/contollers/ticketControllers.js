@@ -96,8 +96,22 @@ export const createTicket = async (req, res) => {
 // GET /api/tickets/mine — the logged-in user's own tickets
 export const getMyTickets = async (req, res) => {
   try {
-    const tickets = await SupportTicket.find({ user: req.user.id }).sort({ updatedAt: -1 });
-    res.json({ success: true, tickets });
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
+
+    const [totalCount, tickets] = await Promise.all([
+      SupportTicket.countDocuments({ user: req.user.id }),
+      SupportTicket.find({ user: req.user.id }).sort({ updatedAt: -1 }).skip(skip).limit(limit),
+    ]);
+
+    res.json({
+      success: true,
+      tickets,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+      totalCount,
+    });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -106,10 +120,26 @@ export const getMyTickets = async (req, res) => {
 // GET /api/tickets/admin/all — every ticket, admin only
 export const getAllTickets = async (req, res) => {
   try {
-    const tickets = await SupportTicket.find({})
-      .populate("user", "name email")
-      .sort({ updatedAt: -1 });
-    res.json({ success: true, tickets });
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [totalCount, tickets] = await Promise.all([
+      SupportTicket.countDocuments({}),
+      SupportTicket.find({})
+        .populate("user", "name email")
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit),
+    ]);
+
+    res.json({
+      success: true,
+      tickets,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+      totalCount,
+    });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }

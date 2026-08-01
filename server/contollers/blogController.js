@@ -6,6 +6,7 @@ import User from "../models/userModel.js";
 import Notification from "../models/notificationModel.js";
 import main from "../configs/gemini.js";
 
+
 export const addBlog = async (req, res) => {
   try {
     const { title, subTitle, description, category, isPublished, scheduledFor, tags } = JSON.parse(
@@ -74,10 +75,29 @@ export const addBlog = async (req, res) => {
 
 export const getAllBlogs = async (req, res) => {
   try {
-    const blogs = await Blog.find({ isPublished: true })
-      .populate("author", "name username")
-      .sort({ createdAt: -1 });
-    res.json({ success: true, blogs });
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 9));
+    const skip = (page - 1) * limit;
+
+    // Run the count and the actual fetch concurrently — they're independent
+    // queries, no reason to wait for one before starting the other.
+    const [totalCount, blogs] = await Promise.all([
+      Blog.countDocuments({ isPublished: true }),
+      Blog.find({ isPublished: true })
+        .populate("author", "name username")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+    ]);
+
+    res.json({
+      success: true,
+      blogs,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+      totalCount,
+      hasMore: skip + blogs.length < totalCount,
+    });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -129,8 +149,22 @@ export const trackBlogView = async (req, res) => {
 // comment count attached to each — powers the "My Posts" analytics view.
 export const getMyBlogs = async (req, res) => {
   try {
-    const blogs = await Blog.find({ author: req.user.id }).sort({ createdAt: -1 }).lean();
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
 
+    const [totalCount, blogs] = await Promise.all([
+      Blog.countDocuments({ author: req.user.id }),
+      Blog.find({ author: req.user.id })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+    ]);
+
+    // Only aggregate comment counts for THIS page's blogs, not the user's
+    // entire history — cheaper, and the result is the same either way
+    // since we only display counts for what's actually on screen.
     const commentCounts = await Comment.aggregate([
       { $match: { blog: { $in: blogs.map((b) => b._id) } } },
       { $group: { _id: "$blog", count: { $sum: 1 } } },
@@ -145,7 +179,14 @@ export const getMyBlogs = async (req, res) => {
       dislikeCount: (b.dislikedBy || []).length,
     }));
 
-    res.json({ success: true, blogs: enriched });
+    res.json({
+      success: true,
+      blogs: enriched,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+      totalCount,
+      hasMore: skip + blogs.length < totalCount,
+    });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -447,16 +488,51 @@ export const getBookmarkStatus = async (req, res) => {
 // GET /api/blog/bookmarks — full list of the logged-in user's saved blogs
 export const getBookmarkedBlogs = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).populate({
-      path: "bookmarks",
-      populate: { path: "author", select: "name username" },
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
+
+    // Bookmarks are just an array of IDs on the User doc (no separate
+    // timestamp per bookmark) — slice the ID array first to preserve the
+    // order they were saved in, THEN fetch full blog docs for just that
+    // page. Cheaper than populating the user's entire bookmark history.
+    const user = await User.findById(req.user.id).select("bookmarks").lean();
+    const allIds = user.bookmarks || [];
+    const totalCount = allIds.length;
+    const pageIds = allIds.slice(skip, skip + limit);
+
+    const blogDocs = await Blog.find({
+      _id: { $in: pageIds },
+    }).populate("author", "name username");
+
+    // Blog.find({ $in }) doesn't preserve array order, so re-sort the
+    // results to match pageIds' original order.
+    const blogMap = Object.fromEntries(
+      blogDocs.map((b) => [b._id.toString(), b])
+    );
+
+    const blogs = pageIds
+      .map((id) => blogMap[id.toString()])
+      .filter(Boolean);
+
+    res.json({
+      success: true,
+      blogs,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+      totalCount,
+      hasMore: skip + blogs.length < totalCount,
     });
-    res.json({ success: true, blogs: user.bookmarks });
   } catch (error) {
-    res.json({ success: false, message: error.message });
+    res.json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
+
+// POST /api/blog/vote...
 // POST /api/blog/vote — requires login. body: { blogId, type }
 // type: "like" | "dislike" | "none" (clicking an active vote again removes it)
 export const voteBlog = async (req, res) => {

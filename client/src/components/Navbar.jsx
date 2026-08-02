@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import Logo from "../assets/navbarr.png";
-import { assets } from "../assets/assets";
+import { assets } from "../assets/assets.js";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../context/AppContext";
 import { HiOutlinePencilAlt, HiOutlineMenu, HiX } from "react-icons/hi";

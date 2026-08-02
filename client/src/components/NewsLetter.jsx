@@ -56,10 +56,10 @@ const NewsLetter = () => {
         ) : (
           <form
             onSubmit={handleSubmit}
-            className="flex flex-col sm:flex-row items-stretch gap-3 max-w-md mx-auto"
+            className="flex flex-col sm:flex-row items-center sm:items-stretch gap-3 max-w-md mx-auto"
           >
             <input
-              className="flex-1 h-12 px-4 rounded-xl sm:rounded-r-none border-0 outline-none bg-white/95 text-[#241F2E] placeholder:text-[#241F2E]/40 focus:ring-2 focus:ring-[#C9A227]/60 transition-all"
+              className="w-full sm:flex-1 h-12 px-4 rounded-xl sm:rounded-r-none border border-white/15 sm:border-0 outline-none bg-white text-base text-[#241F2E] placeholder:text-[#241F2E]/40 focus:ring-2 focus:ring-[#C9A227]/60 transition-all"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -69,7 +69,7 @@ const NewsLetter = () => {
             <button
               type="submit"
               disabled={loading}
-              className={`h-12 px-8 rounded-xl sm:rounded-l-none font-medium text-white bg-primary transition-all cursor-pointer whitespace-nowrap ${
+              className={`h-10 sm:h-12 px-6 sm:px-8 rounded-full sm:rounded-xl sm:rounded-l-none text-sm sm:text-base font-medium text-white bg-primary transition-all cursor-pointer whitespace-nowrap ${
                 loading ? "opacity-60 cursor-not-allowed" : "hover:bg-[#453adf]"
               }`}
             >

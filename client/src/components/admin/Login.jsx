@@ -91,9 +91,9 @@ const Login = () => {
             `}</style>
 
             {/* Left panel — editorial / brand side */}
-            <div className="relative lg:w-[46%] lg:min-h-screen flex flex-col justify-between overflow-hidden px-6 sm:px-10 lg:px-14 py-8 sm:py-10 lg:py-14 bg-[linear-gradient(160deg,_#1B1830_0%,_#2E1F66_65%,_#3B2C7A_100%)]">
+            <div className="relative flex flex-col justify-start sm:justify-between gap-10 sm:gap-0 lg:w-[46%] lg:min-h-screen overflow-hidden px-6 sm:px-10 lg:px-14 py-8 sm:py-10 lg:py-14 bg-[linear-gradient(160deg,#1B1830_0%,#2E1F66_65%,#3B2C7A_100%)]">
                 {/* decorative oversized quote mark — hidden on small phones, too dominant there */}
-                <span className="ql-display pointer-events-none select-none absolute -top-6 -left-2 text-[120px] sm:text-[180px] lg:text-[220px] leading-none text-white/[0.05] hidden sm:block">
+                <span className="ql-display pointer-events-none select-none absolute -top-6 -left-2 text-[120px] sm:text-[180px] lg:text-[220px] leading-none text-white/5 hidden sm:block">
                     &ldquo;
                 </span>
 
@@ -117,7 +117,7 @@ const Login = () => {
                         height="24"
                         viewBox="0 0 180 24"
                         fill="none"
-                        className="mt-4 sm:mt-6 max-w-[140px] sm:max-w-none"
+                        className="mt-4 sm:mt-6 max-w-35 sm:max-w-none"
                         aria-hidden="true"
                     >
                         <path
@@ -227,7 +227,7 @@ const Login = () => {
                             type="submit"
                             disabled={loading}
                             className={`w-full py-3.5 rounded-xl font-medium text-white bg-primary shadow-[0_8px_20px_-6px_rgba(80,68,229,0.55)] transition-all cursor-pointer ${
-                                loading ? "opacity-60 cursor-not-allowed" : "hover:bg-[#453adf] hover:-translate-y-[1px]"
+                                loading ? "opacity-60 cursor-not-allowed" : "hover:bg-[#453adf] hover:-translate-y-px"
                             }`}
                         >
                             {loading

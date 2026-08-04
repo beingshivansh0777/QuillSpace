@@ -270,26 +270,42 @@ export const addComment = async (req, res) => {
   }
 };
 
+
 // POST /api/blog/comments — all comments for a blog, live (no approval gate),
-// organized into a two-level tree: top-level comments each with a `replies` array.
+// organized into a fully nested tree (comments can reply to comments at any depth).
 export const getBlogComments = async (req, res) => {
   try {
     const { blogId } = req.body;
     const all = await Comment.find({ blog: blogId })
       .populate("user", "name username avatar")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: 1 }); // oldest first, so children build in order
 
-    const topLevel = all.filter((c) => !c.parent);
-    const replies = all.filter((c) => c.parent);
+    // Build a lookup map: id -> comment object (with a replies[] we'll fill in)
+    const byId = new Map();
+    all.forEach((c) => {
+      byId.set(c._id.toString(), { ...c.toObject(), replies: [] });
+    });
 
-    const tree = topLevel.map((c) => ({
-      ...c.toObject(),
-      replies: replies
-        .filter((r) => r.parent.toString() === c._id.toString())
-        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)),
-    }));
+    const roots = [];
 
-    res.json({ success: true, comments: tree });
+    byId.forEach((comment) => {
+      if (comment.parent) {
+        const parent = byId.get(comment.parent.toString());
+        if (parent) {
+          parent.replies.push(comment);
+        } else {
+          // parent was deleted / not found — treat as a root so it isn't lost
+          roots.push(comment);
+        }
+      } else {
+        roots.push(comment);
+      }
+    });
+
+    // Sort roots newest-first (to match your old behavior), replies stay oldest-first (already sorted above)
+    roots.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json({ success: true, comments: roots });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }

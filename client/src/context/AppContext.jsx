@@ -64,7 +64,8 @@ export const AppProvider = ({children}) => {
 
      const value = {
         axios, navigate, token, setToken, user, setUser, logout,
-        blogs, setBlogs , input ,setInput
+        blogs, setBlogs , input ,setInput,
+        fetchUser
      }
 
     return (

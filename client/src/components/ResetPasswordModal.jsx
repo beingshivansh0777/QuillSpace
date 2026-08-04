@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { useAppContext } from "../context/AppContext.jsx";
 import toast from "react-hot-toast";
 import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
@@ -28,7 +29,7 @@ const PasswordField = ({ label, value, onChange, show, toggleShow, placeholder }
 );
 
 const ResetPasswordModal = ({ onClose }) => {
-    const { axios, user } = useAppContext();
+    const { axios, user, fetchUser } = useAppContext();
 
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -60,6 +61,7 @@ const ResetPasswordModal = ({ onClose }) => {
             });
             if (data.success) {
                 toast.success(data.message);
+                await fetchUser(); // refresh context so hasPassword updates immediately (fixes stale delete-account flow)
                 onClose();
             } else {
                 toast.error(data.message);
@@ -71,13 +73,19 @@ const ResetPasswordModal = ({ onClose }) => {
         }
     };
 
-    return (
+    // Rendered via portal straight into document.body so this modal is never
+    // trapped inside an ancestor with backdrop-filter/transform/filter set
+    // (e.g. Navbar's `backdrop-blur-md`) — those properties create a new
+    // containing block for `position: fixed` descendants, which otherwise
+    // makes the modal position itself relative to that ancestor instead of
+    // the real viewport.
+    return createPortal(
         <div
-            className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100] px-4"
+            className="fixed inset-0 bg-black/40 flex items-start justify-center z-100 px-4 py-10 overflow-y-auto"
             onClick={onClose}
         >
             <div
-                className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl"
+                className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl my-auto"
                 onClick={(e) => e.stopPropagation()}
             >
                 <h2 className="text-xl font-semibold text-gray-800 mb-1">
@@ -139,7 +147,8 @@ const ResetPasswordModal = ({ onClose }) => {
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

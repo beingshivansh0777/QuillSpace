@@ -36,11 +36,11 @@ const DeleteAccountModal = ({ hasPassword, onClose }) => {
 
     return (
         <div
-            className="fixed inset-0 bg-black/40 flex items-center justify-center z-100 px-4"
+            className="fixed inset-0 bg-black/40 flex items-start justify-center z-100 px-4 py-10 overflow-y-auto"
             onClick={onClose}
         >
             <div
-                className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl"
+                className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl my-auto"
                 onClick={(e) => e.stopPropagation()}
             >
                 <h2 className="text-lg font-semibold text-red-600 mb-1">Delete your account?</h2>

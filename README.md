@@ -65,7 +65,7 @@ A full-stack blogging platform built with the MERN stack — writers publish, re
 
 ### 💬 Comments
 - Post live instantly, no approval delay
-- One level of nested replies
+- Infinite level of nested replies.
 -  Like comments and replies
 -  Report/flag a comment for admin review
 

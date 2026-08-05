@@ -1,6 +1,6 @@
 import React from 'react'
 import { assets, footer_data } from '../assets/assets'
-import Logo from '../assets/logo.jpeg'
+import Logo from '../assets/navbarr.png'
 import { MdEmail } from "react-icons/md";
 import { FaInstagram, FaTwitter, FaLinkedin, FaGithub } from "react-icons/fa";
 
@@ -12,7 +12,7 @@ const Footer = () => {
         {/* Left Section */}
         <div>
           <img src={Logo} alt="" className='w-32 sm:w-44' />
-          <p className='max-w-[410px] mt-6 text-blue-950'>
+          <p className='max-w-102.5 mt-6 text-blue-950'>
             "QuillSpace is more than just a name - it's a space where creativity meets technology. 
             We bring together blogs, projects and stories that spark curiosity, inspire innovation, 
             and connect like-minded thinkers."

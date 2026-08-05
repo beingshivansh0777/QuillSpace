@@ -12,6 +12,7 @@ import { FaRegBookmark, FaBookmark } from "react-icons/fa6";
 import { HiOutlineFlag } from "react-icons/hi";
 import ReportModal from "../components/ReportModel.jsx";
 import CommentItem from "../components/CommentItem.jsx";
+import MentionTextarea from "../components/MentionTextarea.jsx";
 
 // --- Recursive tree helpers (comments can now nest to any depth) ---
 
@@ -58,6 +59,9 @@ const Blog = () => {
   const [bookmarked, setBookmarked] = useState(false);
   const [reportingBlog, setReportingBlog] = useState(false);
   const [reportingComment, setReportingComment] = useState(null); // comment id, or null
+
+  const [isFollowingAuthor, setIsFollowingAuthor] = useState(false);
+  const [followAuthorLoading, setFollowAuthorLoading] = useState(false);
 
   const fetchBlogData = async () => {
     try {
@@ -173,6 +177,51 @@ const Blog = () => {
       );
     } catch (error) {
       toast.error(error.message);
+    }
+  };
+
+  // Check follow status for this blog's author once both the blog and the
+  // viewer's own identity are known — skipped entirely for the author's own
+  // post, and re-runs if the viewer logs in/out while already on the page.
+  useEffect(() => {
+    if (!data?.author?._id || !token) {
+      setIsFollowingAuthor(false);
+      return;
+    }
+    if (data.author._id === user?._id) return; // can't follow yourself
+
+    const fetchAuthorFollowStatus = async () => {
+      try {
+        const { data: res } = await axios.get(`/api/follow/status/${data.author._id}`);
+        if (res.success) setIsFollowingAuthor(res.isFollowing);
+      } catch (error) {
+        // non-critical — button just defaults to "Follow"
+      }
+    };
+    fetchAuthorFollowStatus();
+  }, [data?.author?._id, token, user?._id]);
+
+  const handleToggleFollowAuthor = async () => {
+    if (!token) {
+      toast.error("Please login to follow writers.");
+      return;
+    }
+
+    setFollowAuthorLoading(true);
+    const wasFollowing = isFollowingAuthor;
+    setIsFollowingAuthor(!wasFollowing); // optimistic
+
+    try {
+      const { data: res } = await axios.post(`/api/follow/${data.author._id}`);
+      if (!res.success) {
+        toast.error(res.message);
+        setIsFollowingAuthor(wasFollowing);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message);
+      setIsFollowingAuthor(wasFollowing);
+    } finally {
+      setFollowAuthorLoading(false);
     }
   };
 
@@ -347,19 +396,35 @@ const Blog = () => {
         )}
 
         {data.author && (
-          <p className="mt-4 text-sm text-[#241F2E]/50">
-            Written by{" "}
-            {data.author.username ? (
-              <Link
-                to={`/user/${data.author.username}`}
-                className="text-primary font-medium hover:underline"
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <p className="text-sm text-[#241F2E]/50">
+              Written by{" "}
+              {data.author.username ? (
+                <Link
+                  to={`/user/${data.author.username}`}
+                  className="text-primary font-medium hover:underline"
+                >
+                  {data.author.name}
+                </Link>
+              ) : (
+                <span className="text-[#241F2E]/70 font-medium">{data.author.name}</span>
+              )}
+            </p>
+
+            {token && user?._id !== data.author._id && (
+              <button
+                onClick={handleToggleFollowAuthor}
+                disabled={followAuthorLoading}
+                className={`text-xs font-medium px-3 py-1 rounded-full border transition-all cursor-pointer ${
+                  isFollowingAuthor
+                    ? "border-[#241F2E]/20 text-[#241F2E]/60 hover:bg-red-50 hover:border-red-200 hover:text-red-500"
+                    : "bg-primary text-white border-primary hover:bg-[#453adf]"
+                } ${followAuthorLoading ? "opacity-60 cursor-not-allowed" : ""}`}
               >
-                {data.author.name}
-              </Link>
-            ) : (
-              <span className="text-[#241F2E]/70 font-medium">{data.author.name}</span>
+                {isFollowingAuthor ? "Following" : "Follow"}
+              </button>
             )}
-          </p>
+          </div>
         )}
       </div>
 
@@ -436,13 +501,13 @@ const Blog = () => {
 
           {token ? (
             <form onSubmit={addComment} className="flex flex-col items-start gap-3">
-              <textarea
-                onChange={(e) => setContent(e.target.value)}
+              <MentionTextarea
                 value={content}
-                placeholder="Share your thoughts…"
+                onValueChange={setContent}
+                placeholder="Share your thoughts… (@ to mention someone)"
                 required
                 className="w-full p-3.5 rounded-xl border border-[#241F2E]/15 bg-white outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all h-32 text-sm text-[#241F2E] placeholder:text-[#241F2E]/35"
-              ></textarea>
+              />
               <button
                 disabled={submittingComment}
                 className={`rounded-full px-7 py-2.5 text-sm font-medium text-white bg-primary transition-all cursor-pointer ${

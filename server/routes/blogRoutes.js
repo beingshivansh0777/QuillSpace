@@ -18,6 +18,8 @@ import {
   updateBlog,
   voteBlog,
   trackBlogView,
+  getFollowingFeed,
+  getBlogsByAuthor
 } from "../contollers/blogController.js";
 import upload from "../middleware/multer.js";
 import auth from "../middleware/auth.js";
@@ -71,6 +73,8 @@ blogRouter.get("/all", getAllBlogs);
 blogRouter.get("/mine", auth, getMyBlogs);
 blogRouter.get("/bookmarks", auth, getBookmarkedBlogs);
 blogRouter.get("/bookmark-status/:blogId", auth, getBookmarkStatus);
+blogRouter.get("/feed", auth, getFollowingFeed);
+blogRouter.get("/author/:username", getBlogsByAuthor);   
 blogRouter.post("/track-view/:blogId", optionalAuth, trackBlogView);
 
 /**

@@ -10,6 +10,7 @@ import {
   forgotPassword,
   resetPassword,
   deleteAccount,
+  searchUsers,
 } from "../contollers/authController.js";
 import auth from "../middleware/auth.js";
 import upload from "../middleware/multer.js";
@@ -129,5 +130,6 @@ authRouter.delete("/delete-account", auth, deleteAccount);
  *         description: Public profile (name, username, bio, avatar only)
  */
 authRouter.get("/user/:username", getPublicProfile);
+authRouter.get("/search-users", auth, searchUsers);
 
 export default authRouter;

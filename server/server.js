@@ -18,7 +18,9 @@ import reportRouter from "./routes/reportRoutes.js";
 import newsletterRouter from "./routes/newsLetterRoutes.js";
 import ticketRouter from "./routes/ticketRoutes.js";
 import publishScheduledBlogs from "./jobs/publishScheduled.js";
+import followRouter from "./routes/followRoutes.js";
 import { generalLimiter } from "./middleware/rateLimiters.js";
+
 
 const app = express();
 const PORT =process.env.PORT || 3000;
@@ -63,6 +65,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/notifications", notificationRouter);
 app.use("/api/newsletter", newsletterRouter);
 app.use("/api/tickets", ticketRouter);
+app.use('/api/follow', followRouter)   
 
 // Checks every minute for scheduled blog posts whose time has arrived,
 // and publishes them automatically. Errors are handled and logged inside

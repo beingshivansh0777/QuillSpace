@@ -1,8 +1,46 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import Moment from "moment";
 import { FaRegHeart, FaHeart } from "react-icons/fa6";
+import MentionTextarea from "./MentionTextarea";
 
 const MAX_VISUAL_DEPTH = 4;
+
+// Same pattern used server-side to detect mentions — usernames are at
+// least 3 characters per the registration/profile validation rules.
+const MENTION_REGEX = /@([a-zA-Z0-9_]{3,})/g;
+
+// Splits comment text into plain strings and clickable @mention links.
+// Note: this links ANY @word that looks like a username, whether or not
+// that user actually exists — clicking a nonexistent one just lands on
+// PublicProfile's existing "User not found" state, so it's a safe default
+// without needing an extra lookup per comment render.
+const renderWithMentions = (text) => {
+  const parts = [];
+  let lastIndex = 0;
+  const regex = new RegExp(MENTION_REGEX);
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <Link
+        key={`${match.index}-${match[1]}`}
+        to={`/user/${match[1]}`}
+        className="text-primary font-medium hover:underline"
+      >
+        @{match[1]}
+      </Link>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return parts;
+};
 
 const CommentItem = ({ comment, depth = 0, token, user, onLike, onReply, onReport }) => {
   const [replying, setReplying] = useState(false);
@@ -46,7 +84,9 @@ const CommentItem = ({ comment, depth = 0, token, user, onLike, onReply, onRepor
         </span>
       </div>
 
-      <p className="text-sm text-[#241F2E]/70 ml-9.5">{comment.content}</p>
+      <p className="text-sm text-[#241F2E]/70 ml-9.5 whitespace-pre-wrap wrap-break-word">
+        {renderWithMentions(comment.content)}
+      </p>
 
       <div className="flex items-center gap-4 ml-9.5 mt-2">
         <button
@@ -74,10 +114,10 @@ const CommentItem = ({ comment, depth = 0, token, user, onLike, onReply, onRepor
 
       {replying && (
         <div className="ml-9.5 mt-3 flex flex-col gap-2">
-          <textarea
+          <MentionTextarea
             value={replyContent}
-            onChange={(e) => setReplyContent(e.target.value)}
-            placeholder={`Reply to ${comment.user?.name || comment.name}…`}
+            onValueChange={setReplyContent}
+            placeholder={`Reply to ${comment.user?.name || comment.name}… (@ to mention someone)`}
             className="w-full p-2.5 rounded-lg border border-[#241F2E]/15 bg-[#FBF9F5] outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all h-20 text-sm"
           />
           <div className="flex gap-2">

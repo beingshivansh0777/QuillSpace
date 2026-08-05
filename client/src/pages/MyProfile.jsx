@@ -5,6 +5,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import EditProfileModal from "../components/EditProfileModal";
 import DeleteAccountModal from "../components/DeleteAccountModal";
+import FollowListModal from "../components/FollowListModal";
 import Moment from "moment";
 import toast from "react-hot-toast";
 
@@ -21,6 +22,10 @@ const MyProfile = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPhotoZoom, setShowPhotoZoom] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followListType, setFollowListType] = useState(null); // "followers" | "following" | null
 
   const fetchMyPosts = async () => {
     try {
@@ -40,11 +45,28 @@ const MyProfile = () => {
     }
   };
 
+  const fetchFollowCounts = async () => {
+    if (!user?._id) return;
+    try {
+      const { data } = await axios.get(`/api/follow/status/${user._id}`);
+      if (data.success) {
+        setFollowerCount(data.followerCount);
+        setFollowingCount(data.followingCount);
+      }
+    } catch (error) {
+      // non-critical — counts just stay at 0
+    }
+  };
+
   useEffect(() => {
     if (!token) return;
     setLoading(true);
     Promise.all([fetchMyPosts(), fetchSavedBlogs()]).finally(() => setLoading(false));
   }, [token]);
+
+  useEffect(() => {
+    fetchFollowCounts();
+  }, [user?._id]);
 
   const handleDelete = async (blogId) => {
     if (!window.confirm("Delete this post? This can't be undone.")) return;
@@ -108,7 +130,7 @@ const MyProfile = () => {
 
       <div className="max-w-3xl mx-auto px-5 py-12">
         {/* Profile header */}
-        <div className="flex items-center gap-4 mb-10">
+        <div className="flex items-center gap-4 mb-4">
           <div
             onClick={() => user?.avatar && setShowPhotoZoom(true)}
             className={`w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-2xl font-semibold shrink-0 overflow-hidden ${
@@ -131,6 +153,26 @@ const MyProfile = () => {
             className="text-sm font-medium text-primary border border-primary/30 hover:bg-primary/5 rounded-full px-4 py-2 transition-colors cursor-pointer shrink-0"
           >
             Edit
+          </button>
+        </div>
+
+        {/* Follower / Following counts — clicking opens the list modal */}
+        <div className="flex items-center gap-5 mb-10 ml-1">
+          <button
+            onClick={() => setFollowListType("followers")}
+            className="text-sm cursor-pointer hover:underline"
+          >
+            <span className="font-semibold text-[#241F2E]">{followerCount}</span>
+            <span className="text-[#241F2E]/50 ml-1">
+              {followerCount === 1 ? "Follower" : "Followers"}
+            </span>
+          </button>
+          <button
+            onClick={() => setFollowListType("following")}
+            className="text-sm cursor-pointer hover:underline"
+          >
+            <span className="font-semibold text-[#241F2E]">{followingCount}</span>
+            <span className="text-[#241F2E]/50 ml-1">Following</span>
           </button>
         </div>
 
@@ -292,6 +334,14 @@ const MyProfile = () => {
         <DeleteAccountModal
           hasPassword={user?.hasPassword}
           onClose={() => setShowDeleteModal(false)}
+        />
+      )}
+
+      {followListType && (
+        <FollowListModal
+          userId={user._id}
+          type={followListType}
+          onClose={() => setFollowListType(null)}
         />
       )}
 

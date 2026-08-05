@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { HiOutlineBell, HiSparkles, HiOutlineExclamationCircle } from "react-icons/hi";
+import { HiOutlineBell, HiSparkles, HiOutlineExclamationCircle, HiOutlineUserAdd } from "react-icons/hi";
 import Moment from "moment";
 import { useAppContext } from "../context/AppContext";
 
@@ -57,6 +57,8 @@ const NotificationBell = () => {
       navigate(user?.role === "admin" ? `/admin/tickets/${notif.ticket}` : `/support/${notif.ticket}`);
     } else if (notif.blog?._id) {
       navigate(`/blog/${notif.blog._id}`);
+    } else if (notif.type === "new_follower" && notif.actor?.username) {
+      navigate(`/user/${notif.actor.username}`);
     }
   };
 
@@ -95,6 +97,12 @@ const NotificationBell = () => {
     }
     if (notif.type === "ticket_status_changed") {
       return "Your support ticket status was updated.";
+    }
+    if (notif.type === "new_follower") {
+      return `${actorName} started following you`;
+    }
+    if (notif.type === "comment_mention") {
+      return `${actorName} mentioned you in a comment on "${notif.blog?.title || "a post"}"`;
     }
     return "New notification";
   };
@@ -148,6 +156,8 @@ const NotificationBell = () => {
                     className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 overflow-hidden ${
                       notif.type === "blog_deleted" || notif.type === "comment_deleted"
                         ? "bg-red-50 text-red-500"
+                        : notif.type === "new_follower"
+                        ? "bg-primary/10 text-primary"
                         : "bg-primary/10 text-primary"
                     }`}
                   >
@@ -155,6 +165,8 @@ const NotificationBell = () => {
                       <HiSparkles size={14} />
                     ) : notif.type === "blog_deleted" || notif.type === "comment_deleted" ? (
                       <HiOutlineExclamationCircle size={15} />
+                    ) : notif.type === "new_follower" && !notif.actor?.avatar ? (
+                      <HiOutlineUserAdd size={14} />
                     ) : notif.actor?.avatar ? (
                       <img src={notif.actor.avatar} alt="" className="w-full h-full object-cover" />
                     ) : (

@@ -185,6 +185,30 @@ export const getPublicProfile = async (req, res) => {
     }
 };
 
+
+// Escapes regex special characters so user search input can never be
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// GET /api/auth/search-users?q=partial — powers @mention autocomplete in comments
+export const searchUsers = async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q || !q.trim()) {
+            return res.json({ success: true, users: [] });
+        }
+
+        const users = await User.find({
+            username: { $regex: `^${escapeRegex(q.trim())}`, $options: "i" },
+        })
+            .select("name username avatar")
+            .limit(5);
+
+        res.json({ success: true, users });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
 // GET ME
 export const getMe = async (req, res) => {
     try {

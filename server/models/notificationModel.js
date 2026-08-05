@@ -23,9 +23,12 @@ const notificationSchema = new mongoose.Schema(
         "new_ticket",
         "ticket_reply",
         "ticket_status_changed",
+        "new_follower",
+        "comment_mention",
       ],
       required: true,
     },
+
     ticket: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SupportTicket",
@@ -52,7 +55,7 @@ const notificationSchema = new mongoose.Schema(
       default: false,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const Notification = mongoose.model("Notification", notificationSchema);

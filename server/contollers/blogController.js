@@ -4,8 +4,89 @@ import Blog from "../models/blogModel.js";
 import Comment from "../models/commentModel.js";
 import User from "../models/userModel.js";
 import Notification from "../models/notificationModel.js";
+import Follow from "../models/followModel.js";
 import main from "../configs/gemini.js";
 
+
+// GET /api/blog/feed — published posts from people the logged-in user follows.
+// Auth required (there's no meaningful "following feed" for a logged-out visitor).
+export const getFollowingFeed = async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 9));
+    const skip = (page - 1) * limit;
+
+    const follows = await Follow.find({ follower: req.user.id }).select("following").lean();
+    const followingIds = follows.map((f) => f.following);
+
+    if (followingIds.length === 0) {
+      return res.json({
+        success: true,
+        blogs: [],
+        currentPage: page,
+        totalPages: 0,
+        totalCount: 0,
+        hasMore: false,
+      });
+    }
+
+    const [totalCount, blogs] = await Promise.all([
+      Blog.countDocuments({ author: { $in: followingIds }, isPublished: true }),
+      Blog.find({ author: { $in: followingIds }, isPublished: true })
+        .populate("author", "name username")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+    ]);
+
+    res.json({
+      success: true,
+      blogs,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+      totalCount,
+      hasMore: skip + blogs.length < totalCount,
+    });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/blog/author/:username — public: this author's published posts,
+// most recent first. Used on the public profile page.
+export const getBlogsByAuthor = async (req, res) => {
+  try {
+    const { username } = req.params;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 9));
+    const skip = (page - 1) * limit;
+
+    const author = await User.findOne({ username }).select("_id");
+    if (!author) {
+      return res.json({ success: false, message: "User not found." });
+    }
+
+    const [totalCount, blogs] = await Promise.all([
+      Blog.countDocuments({ author: author._id, isPublished: true }),
+      Blog.find({ author: author._id, isPublished: true })
+        .populate("author", "name username")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+    ]);
+
+    res.json({
+      success: true,
+      blogs,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+      totalCount,
+      hasMore: skip + blogs.length < totalCount,
+    });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
 
 export const addBlog = async (req, res) => {
   try {
@@ -263,6 +344,23 @@ export const addComment = async (req, res) => {
       });
     }
 
+    const MENTION_REGEX = /@([a-zA-Z0-9_]{3,})/g;
+    const mentionedUsernames = [...new Set([...content.matchAll(MENTION_REGEX)].map((m) => m[1]))].slice(0, 5);
+
+    if (mentionedUsernames.length > 0) {
+      const mentionedUsers = await User.find({ username: { $in: mentionedUsernames } }).select("_id");
+      for (const mentionedUser of mentionedUsers) {
+        if (mentionedUser._id.toString() === req.user.id) continue; // don't notify yourself
+        await Notification.create({
+          recipient: mentionedUser._id,
+          actor: req.user.id,
+          type: "comment_mention",
+          blog,
+          comment: comment._id,
+        });
+      }
+    }
+ 
     const populated = await comment.populate("user", "name username avatar");
     res.json({ success: true, message: "Comment posted!", comment: populated });
   } catch (error) {

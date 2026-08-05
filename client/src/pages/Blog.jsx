@@ -12,7 +12,7 @@ import { FaRegBookmark, FaBookmark } from "react-icons/fa6";
 import { HiOutlineFlag } from "react-icons/hi";
 import ReportModal from "../components/ReportModel.jsx";
 import CommentItem from "../components/CommentItem.jsx";
-import MentionTextarea from "../components/MentionTextArea.jsx";
+import MentionTextArea from "../components/MentionTextArea.jsx";
 
 // --- Recursive tree helpers (comments can now nest to any depth) ---
 

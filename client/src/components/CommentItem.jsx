@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import Moment from "moment";
 import { FaRegHeart, FaHeart } from "react-icons/fa6";
-import MentionTextarea from "./MentionTextarea";
+import MentionTextArea from "./MentionTextArea.jsx";
 
 const MAX_VISUAL_DEPTH = 4;
 

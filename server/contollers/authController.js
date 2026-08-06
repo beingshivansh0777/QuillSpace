@@ -9,6 +9,7 @@ import Comment from "../models/commentModel.js";
 import imagekit from "../configs/imageKit.js";
 import buildEmail from "../utils/emailTemplate.js";
 import resend from "../configs/resend.js";
+import { cacheGet, cacheSet, cacheDel } from "../configs/redis.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -174,12 +175,18 @@ export const getPublicProfile = async (req, res) => {
     try {
         const { username } = req.params;
 
+        const cacheKey = `profile:${username}`;
+        const cached = await cacheGet(cacheKey);
+        if (cached) return res.json(cached);
+
         const user = await User.findOne({ username }).select("name username bio avatar createdAt");
         if (!user) {
             return res.json({ success: false, message: "User not found." });
         }
 
-        res.json({ success: true, user });
+        const payload = { success: true, user };
+        await cacheSet(cacheKey, payload, 120);
+        res.json(payload);
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -187,6 +194,7 @@ export const getPublicProfile = async (req, res) => {
 
 
 // Escapes regex special characters so user search input can never be
+// interpreted as regex syntax.
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // GET /api/auth/search-users?q=partial — powers @mention autocomplete in comments
@@ -197,19 +205,32 @@ export const searchUsers = async (req, res) => {
             return res.json({ success: true, users: [] });
         }
 
+        const normalizedQuery = q.trim().toLowerCase();
+        const cacheKey = `search:users:${normalizedQuery}`;
+        const cached = await cacheGet(cacheKey);
+        if (cached) return res.json(cached);
+
         const users = await User.find({
             username: { $regex: `^${escapeRegex(q.trim())}`, $options: "i" },
         })
             .select("name username avatar")
             .limit(5);
 
-        res.json({ success: true, users });
+        const payload = { success: true, users };
+
+        // No explicit invalidation needed — usernames rarely change, and a
+        // 60s staleness window on autocomplete results is harmless (worst
+        // case: a just-renamed user doesn't show up under their new name
+        // for up to a minute).
+        await cacheSet(cacheKey, payload, 60);
+        res.json(payload);
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
 };
 
-// GET ME
+// GET ME — not cached; always reflects the caller's own live state
+// (hasPassword, avatar, etc.) right after actions like changePassword.
 export const getMe = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
@@ -339,6 +360,10 @@ export const deleteAccount = async (req, res) => {
         await Blog.deleteMany({ author: user._id });
         await User.findByIdAndDelete(user._id);
 
+        if (user.username) {
+            await cacheDel(`profile:${user.username}`);
+        }
+
         res.json({ success: true, message: "Your account has been deleted." });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -386,6 +411,11 @@ export const updateProfile = async (req, res) => {
     try {
         const { username, bio } = req.body;
 
+        // Captured BEFORE applying updates — needed to invalidate the OLD
+        // cached profile key too, in case the username itself is changing.
+        const beforeUser = await User.findById(req.user.id).select("username").lean();
+        const previousUsername = beforeUser?.username;
+
         if (username) {
             const trimmed = username.trim();
 
@@ -431,6 +461,15 @@ export const updateProfile = async (req, res) => {
             new: true,
             runValidators: true,
         }).select("-password");
+
+        // Bust the cached public-profile page — for the old username (in
+        // case it changed) and the new one (in case bio/avatar changed but
+        // username stayed the same, or username changed and we want the
+        // new key clean of any stale pre-existing entry).
+        if (previousUsername) await cacheDel(`profile:${previousUsername}`);
+        if (user.username && user.username !== previousUsername) {
+            await cacheDel(`profile:${user.username}`);
+        }
 
         res.json({ success: true, user, message: "Profile updated." });
     } catch (error) {

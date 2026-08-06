@@ -6,7 +6,18 @@ import User from "../models/userModel.js";
 import Notification from "../models/notificationModel.js";
 import Follow from "../models/followModel.js";
 import main from "../configs/gemini.js";
+import { cacheGet, cacheSet, cacheDel, cacheDelPattern } from "../configs/redis.js";
 
+// Looks up an author's username from their id, then clears every cached
+// page of their public "author" post list. Only called from write paths
+// (add/update/delete/publish-toggle), so the extra lookup query is cheap
+// relative to how rarely it runs compared to reads.
+const invalidateAuthorBlogsCache = async (authorId) => {
+  const authorDoc = await User.findById(authorId).select("username").lean();
+  if (authorDoc?.username) {
+    await cacheDelPattern(`blogs:author:${authorDoc.username}:*`);
+  }
+};
 
 // GET /api/blog/feed — published posts from people the logged-in user follows.
 // Auth required (there's no meaningful "following feed" for a logged-out visitor).
@@ -16,18 +27,28 @@ export const getFollowingFeed = async (req, res) => {
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 9));
     const skip = (page - 1) * limit;
 
+    // Short TTL (30s), no explicit invalidation — this feed depends on
+    // every followed author's posts, which is expensive to invalidate
+    // precisely (would need to know all of a user's followers on every
+    // publish). A short TTL is the pragmatic tradeoff instead.
+    const cacheKey = `feed:following:${req.user.id}:page:${page}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) return res.json(cached);
+
     const follows = await Follow.find({ follower: req.user.id }).select("following").lean();
     const followingIds = follows.map((f) => f.following);
 
     if (followingIds.length === 0) {
-      return res.json({
+      const empty = {
         success: true,
         blogs: [],
         currentPage: page,
         totalPages: 0,
         totalCount: 0,
         hasMore: false,
-      });
+      };
+      await cacheSet(cacheKey, empty, 30);
+      return res.json(empty);
     }
 
     const [totalCount, blogs] = await Promise.all([
@@ -39,14 +60,17 @@ export const getFollowingFeed = async (req, res) => {
         .limit(limit),
     ]);
 
-    res.json({
+    const payload = {
       success: true,
       blogs,
       currentPage: page,
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
       hasMore: skip + blogs.length < totalCount,
-    });
+    };
+
+    await cacheSet(cacheKey, payload, 30);
+    res.json(payload);
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -60,6 +84,10 @@ export const getBlogsByAuthor = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 9));
     const skip = (page - 1) * limit;
+
+    const cacheKey = `blogs:author:${username}:page:${page}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) return res.json(cached);
 
     const author = await User.findOne({ username }).select("_id");
     if (!author) {
@@ -75,14 +103,17 @@ export const getBlogsByAuthor = async (req, res) => {
         .limit(limit),
     ]);
 
-    res.json({
+    const payload = {
       success: true,
       blogs,
       currentPage: page,
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
       hasMore: skip + blogs.length < totalCount,
-    });
+    };
+
+    await cacheSet(cacheKey, payload, 60);
+    res.json(payload);
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -142,6 +173,13 @@ export const addBlog = async (req, res) => {
       author: req.user.id,
     });
 
+    if (publishNow) {
+      // Only a live-published post affects the public feed/author list —
+      // drafts and scheduled posts aren't visible there yet.
+      await cacheDelPattern("blogs:all:page:*");
+      await invalidateAuthorBlogsCache(req.user.id);
+    }
+
     const message = scheduleDate
       ? "Blog scheduled!"
       : publishNow
@@ -160,6 +198,10 @@ export const getAllBlogs = async (req, res) => {
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 9));
     const skip = (page - 1) * limit;
 
+    const cacheKey = `blogs:all:page:${page}:limit:${limit}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) return res.json(cached);
+
     // Run the count and the actual fetch concurrently — they're independent
     // queries, no reason to wait for one before starting the other.
     const [totalCount, blogs] = await Promise.all([
@@ -171,14 +213,17 @@ export const getAllBlogs = async (req, res) => {
         .limit(limit),
     ]);
 
-    res.json({
+    const payload = {
       success: true,
       blogs,
       currentPage: page,
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
       hasMore: skip + blogs.length < totalCount,
-    });
+    };
+
+    await cacheSet(cacheKey, payload, 60);
+    res.json(payload);
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -187,11 +232,19 @@ export const getAllBlogs = async (req, res) => {
 export const getBlogById = async (req, res) => {
   try {
     const { blogId } = req.params;
+
+    const cacheKey = `blog:${blogId}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) return res.json(cached);
+
     const blog = await Blog.findById(blogId).populate("author", "name username");
     if (!blog) {
       return res.json({ success: false, message: "Blog Not Found!" });
     }
-    res.json({ success: true, blog });
+
+    const payload = { success: true, blog };
+    await cacheSet(cacheKey, payload, 300);
+    res.json(payload);
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -220,6 +273,10 @@ export const trackBlogView = async (req, res) => {
       await Blog.findByIdAndUpdate(blogId, { $inc: { views: 1 } });
     }
 
+    // Deliberately NOT invalidating the blog:{id} cache here — view counts
+    // update on nearly every request, and the 5-minute TTL on getBlogById
+    // means the count staying slightly stale for that window is an
+    // acceptable tradeoff for not busting the cache on every single view.
     res.json({ success: true });
   } catch (error) {
     res.json({ success: false, message: error.message });
@@ -228,6 +285,7 @@ export const trackBlogView = async (req, res) => {
 
 // Blogs written by the currently logged-in user (any status), with a
 // comment count attached to each — powers the "My Posts" analytics view.
+// Not cached — Tier 3 (low traffic, owner-only, already .lean()-optimized).
 export const getMyBlogs = async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -243,9 +301,6 @@ export const getMyBlogs = async (req, res) => {
         .lean(),
     ]);
 
-    // Only aggregate comment counts for THIS page's blogs, not the user's
-    // entire history — cheaper, and the result is the same either way
-    // since we only display counts for what's actually on screen.
     const commentCounts = await Comment.aggregate([
       { $match: { blog: { $in: blogs.map((b) => b._id) } } },
       { $group: { _id: "$blog", count: { $sum: 1 } } },
@@ -284,6 +339,10 @@ export const deleteBlogById = async (req, res) => {
     await Blog.findByIdAndDelete(id);
     await Comment.deleteMany({ blog: id });
 
+    await cacheDel(`blog:${id}`, `comments:${id}`);
+    await cacheDelPattern("blogs:all:page:*");
+    await invalidateAuthorBlogsCache(blog.author);
+
     // Notify the author — skip if an admin deleted their own post.
     if (blog.author.toString() !== req.user.id) {
       await Notification.create({
@@ -306,6 +365,11 @@ export const togglePublish = async (req, res) => {
     const blog = await Blog.findById(id);
     blog.isPublished = !blog.isPublished;
     await blog.save();
+
+    await cacheDel(`blog:${id}`);
+    await cacheDelPattern("blogs:all:page:*");
+    await invalidateAuthorBlogsCache(blog.author);
+
     res.json({ success: true, message: "Blog status updated." });
   } catch (error) {
     res.json({ success: false, message: error.message });
@@ -330,6 +394,8 @@ export const addComment = async (req, res) => {
       content,
       parent: parent || null,
     });
+
+    await cacheDel(`comments:${blog}`);
 
     // Notify the blog's author that someone commented — skip if they
     // commented on their own post.
@@ -360,7 +426,7 @@ export const addComment = async (req, res) => {
         });
       }
     }
- 
+
     const populated = await comment.populate("user", "name username avatar");
     res.json({ success: true, message: "Comment posted!", comment: populated });
   } catch (error) {
@@ -374,6 +440,11 @@ export const addComment = async (req, res) => {
 export const getBlogComments = async (req, res) => {
   try {
     const { blogId } = req.body;
+
+    const cacheKey = `comments:${blogId}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) return res.json(cached);
+
     const all = await Comment.find({ blog: blogId })
       .populate("user", "name username avatar")
       .sort({ createdAt: 1 }); // oldest first, so children build in order
@@ -403,7 +474,12 @@ export const getBlogComments = async (req, res) => {
     // Sort roots newest-first (to match your old behavior), replies stay oldest-first (already sorted above)
     roots.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    res.json({ success: true, comments: roots });
+    const payload = { success: true, comments: roots };
+
+    // Short TTL — comments post live with no approval delay, so caching
+    // too long would make replies visibly lag for other readers.
+    await cacheSet(cacheKey, payload, 20);
+    res.json(payload);
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -430,6 +506,8 @@ export const toggleCommentLike = async (req, res) => {
         : { $addToSet: { likes: req.user.id } },
       { new: true }
     );
+
+    await cacheDel(`comments:${comment.blog}`);
 
     // Only notify on a fresh like, not on unlike, and never notify yourself.
     if (!alreadyLiked && comment.user.toString() !== req.user.id) {
@@ -508,6 +586,11 @@ export const updateBlog = async (req, res) => {
     }
 
     await blog.save();
+
+    await cacheDel(`blog:${id}`);
+    await cacheDelPattern("blogs:all:page:*");
+    await invalidateAuthorBlogsCache(blog.author);
+
     res.json({ success: true, message: "Blog updated.", blog });
   } catch (error) {
     res.json({ success: false, message: error.message });
@@ -535,6 +618,10 @@ export const publishOwnBlog = async (req, res) => {
     blog.scheduledFor = null;
     await blog.save();
 
+    await cacheDel(`blog:${id}`);
+    await cacheDelPattern("blogs:all:page:*");
+    await invalidateAuthorBlogsCache(blog.author);
+
     res.json({ success: true, message: "Blog published!" });
   } catch (error) {
     res.json({ success: false, message: error.message });
@@ -557,6 +644,10 @@ export const deleteOwnBlog = async (req, res) => {
     await Blog.findByIdAndDelete(id);
     await Comment.deleteMany({ blog: id });
 
+    await cacheDel(`blog:${id}`, `comments:${id}`);
+    await cacheDelPattern("blogs:all:page:*");
+    await invalidateAuthorBlogsCache(blog.author);
+
     res.json({ success: true, message: "Blog deleted." });
   } catch (error) {
     res.json({ success: false, message: error.message });
@@ -564,6 +655,7 @@ export const deleteOwnBlog = async (req, res) => {
 };
 
 // POST /api/blog/bookmark — toggle a blog in the logged-in user's bookmarks
+// Not cached — Tier 3 (per-user, low traffic).
 export const toggleBookmark = async (req, res) => {
   try {
     const { blogId } = req.body;
@@ -587,7 +679,7 @@ export const toggleBookmark = async (req, res) => {
   }
 };
 
-// GET /api/blog/bookmark-status/:blogId
+// GET /api/blog/bookmark-status/:blogId — not cached, Tier 3.
 export const getBookmarkStatus = async (req, res) => {
   try {
     const { blogId } = req.params;
@@ -599,17 +691,13 @@ export const getBookmarkStatus = async (req, res) => {
   }
 };
 
-// GET /api/blog/bookmarks — full list of the logged-in user's saved blogs
+// GET /api/blog/bookmarks — not cached, Tier 3.
 export const getBookmarkedBlogs = async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
     const skip = (page - 1) * limit;
 
-    // Bookmarks are just an array of IDs on the User doc (no separate
-    // timestamp per bookmark) — slice the ID array first to preserve the
-    // order they were saved in, THEN fetch full blog docs for just that
-    // page. Cheaper than populating the user's entire bookmark history.
     const user = await User.findById(req.user.id).select("bookmarks").lean();
     const allIds = user.bookmarks || [];
     const totalCount = allIds.length;
@@ -619,8 +707,6 @@ export const getBookmarkedBlogs = async (req, res) => {
       _id: { $in: pageIds },
     }).populate("author", "name username");
 
-    // Blog.find({ $in }) doesn't preserve array order, so re-sort the
-    // results to match pageIds' original order.
     const blogMap = Object.fromEntries(
       blogDocs.map((b) => [b._id.toString(), b])
     );
@@ -646,7 +732,6 @@ export const getBookmarkedBlogs = async (req, res) => {
 };
 
 
-// POST /api/blog/vote...
 // POST /api/blog/vote — requires login. body: { blogId, type }
 // type: "like" | "dislike" | "none" (clicking an active vote again removes it)
 export const voteBlog = async (req, res) => {
@@ -687,6 +772,10 @@ export const voteBlog = async (req, res) => {
     if (!blog) {
       return res.json({ success: false, message: "Blog not found." });
     }
+
+    // Votes are part of the cached getBlogById payload (via likedBy/dislikedBy
+    // on the blog doc), so the single-blog cache needs busting too.
+    await cacheDel(`blog:${blogId}`);
 
     res.json({
       success: true,

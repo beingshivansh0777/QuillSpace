@@ -1,6 +1,7 @@
 import Follow from "../models/followModel.js";
 import User from "../models/userModel.js";
 import Notification from "../models/notificationModel.js";
+import { cacheGet, cacheSet, cacheDelPattern } from "../configs/redis.js";
 
 // POST /api/follow/:userId — toggle follow/unfollow. Requires login.
 export const toggleFollow = async (req, res) => {
@@ -20,10 +21,12 @@ export const toggleFollow = async (req, res) => {
 
     if (existing) {
       await Follow.findByIdAndDelete(existing._id);
+      await invalidateFollowStatusCache(req.user.id, userId);
       return res.json({ success: true, following: false, message: "Unfollowed." });
     }
 
     await Follow.create({ follower: req.user.id, following: userId });
+    await invalidateFollowStatusCache(req.user.id, userId);
 
     await Notification.create({
       recipient: userId,
@@ -42,11 +45,26 @@ export const toggleFollow = async (req, res) => {
   }
 };
 
+// Clears every cached follow-status entry where either user appears as the
+// target — covers: (a) the exact follower→target pair that just changed,
+// (b) anyone else's cached view of the target's follower count, and
+// (c) anyone else's cached view of the follower's OWN following count
+// (which changed too, since they just followed/unfollowed someone).
+const invalidateFollowStatusCache = async (followerId, targetId) => {
+  await cacheDelPattern(`follow:status:*:${targetId}`);
+  await cacheDelPattern(`follow:status:*:${followerId}`);
+};
+
 // GET /api/follow/status/:userId — optionalAuth (works for logged-out viewers too,
 // they just always get isFollowing: false). Returns counts either way.
 export const getFollowStatus = async (req, res) => {
   try {
     const { userId } = req.params;
+    const viewerKey = req.user ? req.user.id : "anon";
+
+    const cacheKey = `follow:status:${viewerKey}:${userId}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) return res.json(cached);
 
     const [isFollowing, followerCount, followingCount] = await Promise.all([
       req.user
@@ -56,18 +74,22 @@ export const getFollowStatus = async (req, res) => {
       Follow.countDocuments({ follower: userId }),
     ]);
 
-    res.json({
+    const payload = {
       success: true,
       isFollowing: !!isFollowing,
       followerCount,
       followingCount,
-    });
+    };
+
+    await cacheSet(cacheKey, payload, 30);
+    res.json(payload);
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
 };
 
 // GET /api/follow/followers/:userId — paginated list of people following this user
+// Not cached — Tier 3 (low traffic relative to status checks/feeds).
 export const getFollowers = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -98,6 +120,7 @@ export const getFollowers = async (req, res) => {
 };
 
 // GET /api/follow/following/:userId — paginated list of people this user follows
+// Not cached — Tier 3.
 export const getFollowingList = async (req, res) => {
   try {
     const { userId } = req.params;

@@ -1,10 +1,22 @@
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
   server:
     build: ./server
     ports:
       - "4000:3000"
     env_file:
       - ./server/.env
+    environment:
+      # Overrides whatever REDIS_URL might be in .env — inside Compose's
+      # network, "redis" is the service name above, not localhost.
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - redis
     restart: unless-stopped
 
   client:

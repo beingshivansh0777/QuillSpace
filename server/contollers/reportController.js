@@ -1,7 +1,7 @@
 import Blog from "../models/blogModel.js";
 import Comment from "../models/commentModel.js";
-import Notification from "../models/notificationModel.js";
 import Report from "../models/reportModel.js";
+import { notifyUser } from "../utils/notify.js";
 
 
 // POST /api/reports — any logged-in user can flag a blog or comment
@@ -115,7 +115,7 @@ export const deleteReportedContent = async (req, res) => {
         await Blog.findByIdAndDelete(blog._id);
         await Comment.deleteMany({ blog: blog._id });
         if (blog.author.toString() !== req.user.id) {
-          await Notification.create({
+          await notifyUser({
             recipient: blog.author,
             actor: null,
             type: "blog_deleted",
@@ -129,7 +129,7 @@ export const deleteReportedContent = async (req, res) => {
         await Comment.findByIdAndDelete(comment._id);
         await Comment.deleteMany({ parent: comment._id });
         if (comment.user && comment.user.toString() !== req.user.id) {
-          await Notification.create({
+          await notifyUser({
             recipient: comment.user,
             actor: null,
             type: "comment_deleted",

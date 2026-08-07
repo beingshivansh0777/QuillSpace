@@ -3,10 +3,11 @@ import imagekit from "../configs/imageKit.js";
 import Blog from "../models/blogModel.js";
 import Comment from "../models/commentModel.js";
 import User from "../models/userModel.js";
-import Notification from "../models/notificationModel.js";
 import Follow from "../models/followModel.js";
 import main from "../configs/gemini.js";
 import { cacheGet, cacheSet, cacheDel, cacheDelPattern } from "../configs/redis.js";
+import { notifyUser } from "../utils/notify.js";
+import { emitToBlog } from "../configs/socket.js";
 
 // Looks up an author's username from their id, then clears every cached
 // page of their public "author" post list. Only called from write paths
@@ -345,7 +346,7 @@ export const deleteBlogById = async (req, res) => {
 
     // Notify the author — skip if an admin deleted their own post.
     if (blog.author.toString() !== req.user.id) {
-      await Notification.create({
+      await notifyUser({
         recipient: blog.author,
         actor: null,
         type: "blog_deleted",
@@ -401,7 +402,7 @@ export const addComment = async (req, res) => {
     // commented on their own post.
     const blogDoc = await Blog.findById(blog).select("author");
     if (blogDoc && blogDoc.author.toString() !== req.user.id) {
-      await Notification.create({
+      await notifyUser({
         recipient: blogDoc.author,
         actor: req.user.id,
         type: "blog_comment",
@@ -417,7 +418,7 @@ export const addComment = async (req, res) => {
       const mentionedUsers = await User.find({ username: { $in: mentionedUsernames } }).select("_id");
       for (const mentionedUser of mentionedUsers) {
         if (mentionedUser._id.toString() === req.user.id) continue; // don't notify yourself
-        await Notification.create({
+        await notifyUser({
           recipient: mentionedUser._id,
           actor: req.user.id,
           type: "comment_mention",
@@ -511,7 +512,7 @@ export const toggleCommentLike = async (req, res) => {
 
     // Only notify on a fresh like, not on unlike, and never notify yourself.
     if (!alreadyLiked && comment.user.toString() !== req.user.id) {
-      await Notification.create({
+      await notifyUser({
         recipient: comment.user,
         actor: req.user.id,
         type: "comment_like",
@@ -777,10 +778,18 @@ export const voteBlog = async (req, res) => {
     // on the blog doc), so the single-blog cache needs busting too.
     await cacheDel(`blog:${blogId}`);
 
+    const likes = blog.likedBy.length;
+    const dislikes = blog.dislikedBy.length;
+
+    // Live-push the new totals to everyone currently viewing this post —
+    // does NOT include "myVote", since that's specific to each individual
+    // viewer and only makes sense in the direct response below.
+    emitToBlog(blogId, "blog:votes", { blogId, likes, dislikes });
+
     res.json({
       success: true,
-      likes: blog.likedBy.length,
-      dislikes: blog.dislikedBy.length,
+      likes,
+      dislikes,
       myVote: blog.likedBy.some((u) => u.toString() === userId)
         ? "like"
         : blog.dislikedBy.some((u) => u.toString() === userId)

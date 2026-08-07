@@ -1,7 +1,7 @@
 import Follow from "../models/followModel.js";
 import User from "../models/userModel.js";
-import Notification from "../models/notificationModel.js";
 import { cacheGet, cacheSet, cacheDelPattern } from "../configs/redis.js";
+import { notifyUser } from "../utils/notify.js";
 
 // POST /api/follow/:userId — toggle follow/unfollow. Requires login.
 export const toggleFollow = async (req, res) => {
@@ -28,7 +28,7 @@ export const toggleFollow = async (req, res) => {
     await Follow.create({ follower: req.user.id, following: userId });
     await invalidateFollowStatusCache(req.user.id, userId);
 
-    await Notification.create({
+    await notifyUser({
       recipient: userId,
       actor: req.user.id,
       type: "new_follower",

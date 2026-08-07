@@ -1,7 +1,7 @@
 import Blog from "../models/blogModel.js";
 import Comment from "../models/commentModel.js";
 import User from "../models/userModel.js";
-import Notification from "../models/notificationModel.js";
+import { notifyUser } from "../utils/notify.js";
 
 
 // PATCH /api/admin/promote/:userId
@@ -191,7 +191,7 @@ export const deleteCommentbyId = async (req, res) => {
         // Notify the commenter — skip legacy comments with no user ref,
         // and skip if an admin deleted their own comment.
         if (comment.user && comment.user.toString() !== req.user.id) {
-            await Notification.create({
+            await notifyUser({
                 recipient: comment.user,
                 actor: null,
                 type: "comment_deleted",

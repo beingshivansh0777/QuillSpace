@@ -30,7 +30,7 @@ const CATEGORY_LABELS = {
 
 const TicketThread = () => {
     const { id } = useParams();
-    const { axios, user, token } = useAppContext();
+    const { axios, user, token, socket } = useAppContext();
     const navigate = useNavigate();
 
     const [ticket, setTicket] = useState(null);
@@ -57,6 +57,49 @@ const TicketThread = () => {
     useEffect(() => {
         if (token && user) fetchTicket();
     }, [token, user]);
+
+    // Join this ticket's live room while the thread is open, leave when
+    // navigating away — keeps the server from broadcasting every ticket's
+    // traffic to everyone, only to people actually looking at this one.
+    useEffect(() => {
+        if (!socket || !id) return;
+        socket.emit("ticket:join", id);
+        return () => socket.emit("ticket:leave", id);
+    }, [socket, id]);
+
+    // Live message + status updates. The sender's OWN reply already lands
+    // via the REST response in handleReply below (setTicket(data.ticket)),
+    // so this listener skips re-appending a message whose _id we already have
+    // — otherwise the sender would see their own message duplicated.
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleMessage = (payload) => {
+            if (payload.ticketId !== id) return;
+            setTicket((prev) => {
+                if (!prev) return prev;
+                const alreadyHave = prev.messages.some((m) => m._id === payload.message._id);
+                if (alreadyHave) return { ...prev, status: payload.status };
+                return {
+                    ...prev,
+                    status: payload.status,
+                    messages: [...prev.messages, payload.message],
+                };
+            });
+        };
+
+        const handleStatus = (payload) => {
+            if (payload.ticketId !== id) return;
+            setTicket((prev) => (prev ? { ...prev, status: payload.status } : prev));
+        };
+
+        socket.on("ticket:message", handleMessage);
+        socket.on("ticket:status", handleStatus);
+        return () => {
+            socket.off("ticket:message", handleMessage);
+            socket.off("ticket:status", handleStatus);
+        };
+    }, [socket, id]);
 
     const handleReply = async (e) => {
         e.preventDefault();
@@ -183,7 +226,7 @@ const TicketThread = () => {
                 <div className="flex flex-col gap-3 mb-6">
                     {ticket.messages.map((msg, i) => (
                         <div
-                            key={i}
+                            key={msg._id || i}
                             className={`max-w-[85%] p-4 rounded-2xl ${
                                 msg.senderRole === "admin"
                                     ? "bg-primary/5 border border-primary/15 self-start"

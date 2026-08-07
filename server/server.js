@@ -7,9 +7,11 @@ import compression from 'compression'
 import mongoose from 'mongoose'
 import pinoHttp from 'pino-http'
 import swaggerUi from 'swagger-ui-express'
+import { createServer } from 'http'
 import swaggerSpec from './configs/swagger.js';
 import connectDB from './configs/db.js';
 import logger from './configs/logger.js';
+import { initSocket } from './configs/socket.js';
 import adminRouter from './routes/adminRoutes.js';
 import blogRouter from './routes/blogRoutes.js';
 import authRouter from "./routes/authRoutes.js";
@@ -72,7 +74,14 @@ app.use('/api/follow', followRouter)
 // publishScheduledBlogs itself, so this call never needs its own try/catch.
 cron.schedule("* * * * *", publishScheduledBlogs);
 
-app.listen(PORT, () => {
+// Express alone can't host WebSocket connections — Socket.io needs the raw
+// http.Server instance underneath it. createServer(app) wraps the Express
+// app in exactly that, and both HTTP requests and socket connections now
+// share the same server/port, just handled by different libraries.
+const httpServer = createServer(app);
+initSocket(httpServer);
+
+httpServer.listen(PORT, () => {
     logger.info(`Server is running on port ${PORT}`);
 })
 

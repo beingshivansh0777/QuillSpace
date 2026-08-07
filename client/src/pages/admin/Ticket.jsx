@@ -26,7 +26,7 @@ const CATEGORY_LABELS = {
 };
 
 const Tickets = () => {
-  const { axios } = useAppContext();
+  const { axios, socket } = useAppContext();
   const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [filter, setFilter] = useState("all");
@@ -46,6 +46,21 @@ const Tickets = () => {
   useEffect(() => {
     fetchTickets();
   }, []);
+
+  // Live-prepend brand-new tickets the instant someone submits one — admin
+  // sockets auto-join a shared "admins" room server-side, so this fires for
+  // every connected admin without needing per-ticket subscriptions.
+  useEffect(() => {
+    if (!socket) return;
+    const handleNewTicket = (ticket) => {
+      setTickets((prev) => {
+        if (prev.some((t) => t._id === ticket._id)) return prev; // avoid dupes on refetch races
+        return [ticket, ...prev];
+      });
+    };
+    socket.on("admin:newTicket", handleNewTicket);
+    return () => socket.off("admin:newTicket", handleNewTicket);
+  }, [socket]);
 
   const filtered = filter === "all" ? tickets : tickets.filter((t) => t.status === filter);
 

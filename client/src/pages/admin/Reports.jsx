@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import Moment from "moment";
 
 const Reports = () => {
-  const { axios } = useAppContext();
+  const { axios, socket } = useAppContext();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,6 +22,20 @@ const Reports = () => {
   useEffect(() => {
     fetchReports();
   }, []);
+
+  // Live-prepend brand-new reports the instant someone flags something —
+  // same "admins" room pattern as the tickets list.
+  useEffect(() => {
+    if (!socket) return;
+    const handleNewReport = (report) => {
+      setReports((prev) => {
+        if (prev.some((r) => r._id === report._id)) return prev;
+        return [report, ...prev];
+      });
+    };
+    socket.on("admin:newReport", handleNewReport);
+    return () => socket.off("admin:newReport", handleNewReport);
+  }, [socket]);
 
   const handleDismiss = async (id) => {
     try {

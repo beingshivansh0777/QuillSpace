@@ -5,7 +5,7 @@ import Moment from "moment";
 import { useAppContext } from "../context/AppContext";
 
 const NotificationBell = () => {
-  const { axios, token, user } = useAppContext();
+  const { axios, token, user, socket } = useAppContext();
   const navigate = useNavigate();
 
   const [notifications, setNotifications] = useState([]);
@@ -33,9 +33,34 @@ const NotificationBell = () => {
   useEffect(() => {
     if (!token) return;
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000); // poll every 30s
+    // Kept as a safety net in case a socket silently drops — sockets are
+    // now the primary delivery path, so this is just a slow fallback.
+    const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, [token]);
+
+  // Live notifications — pushed the instant something happens (comment,
+  // like, follow, mention, ticket reply, etc.) instead of waiting for the
+  // next poll. Only prepends to the dropdown list if it's already been
+  // opened at least once (matches fetchNotifications' lazy-load pattern);
+  // the unread badge always updates regardless.
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNotification = (notif) => {
+      setUnreadCount((c) => c + 1);
+      setNotifications((prev) => {
+        // Only grow the list if it's already been populated once (dropdown
+        // opened before) — otherwise leave it empty until the user opens
+        // the bell, which fetches the full, correctly-paginated list anyway.
+        if (prev.length === 0) return prev;
+        return [notif, ...prev];
+      });
+    };
+
+    socket.on("notification", handleNotification);
+    return () => socket.off("notification", handleNotification);
+  }, [socket]);
 
   const handleOpen = () => {
     setShowDropdown((v) => !v);

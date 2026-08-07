@@ -80,7 +80,7 @@ const Dashboard = () => {
         </div>
 
         <div className="flex items-center gap-4 bg-white p-4 min-w-58 rounded shadow cursor-pointer hover:scale-105 transition-all ">
-          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
             <HiOutlineUsers size={20} />
           </div>
           <div>
@@ -92,7 +92,7 @@ const Dashboard = () => {
         </div>
 
         <div className="flex items-center gap-4 bg-white p-4 min-w-58 rounded shadow cursor-pointer hover:scale-105 transition-all ">
-          <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0">
             <HiOutlineCheckCircle size={20} />
           </div>
           <div>

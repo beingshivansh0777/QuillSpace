@@ -1,6 +1,6 @@
 import Blog from "../models/blogModel.js";
-import Notification from "../models/notificationModel.js";
 import logger from "../configs/logger.js";
+import { notifyMany } from "../utils/notify.js";
 
 // Publishes any post whose scheduled time has arrived, and notifies its
 // author. Runs on a timer (wired up in server.js via node-cron) rather
@@ -24,7 +24,7 @@ const publishScheduledBlogs = async () => {
       }
     );
 
-    await Notification.insertMany(
+    await notifyMany(
       dueBlogs.map((blog) => ({
         recipient: blog.author,
         actor: null,

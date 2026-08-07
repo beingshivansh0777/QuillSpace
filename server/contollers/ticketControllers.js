@@ -1,10 +1,11 @@
 import fs from "fs";
 import SupportTicket from "../models/supportTicketModel.js";
 import User from "../models/userModel.js";
-import Notification from "../models/notificationModel.js";
 import imagekit from "../configs/imageKit.js";
 import resend from "../configs/resend.js";
 import buildEmail from "../utils/emailTemplate.js";
+import { notifyUser, notifyMany } from "../utils/notify.js";
+import { emitToTicket } from "../configs/socket.js";
 
 const CATEGORY_LABELS = {
   bug: "Bug",
@@ -15,7 +16,7 @@ const CATEGORY_LABELS = {
 
 const notifyAllAdmins = async ({ actor, type, ticket }) => {
   const admins = await User.find({ role: "admin" }).select("_id");
-  await Notification.insertMany(
+  await notifyMany(
     admins
       .filter((a) => a._id.toString() !== actor) // don't notify an admin about their own action
       .map((a) => ({
@@ -198,9 +199,25 @@ export const replyToTicket = async (req, res) => {
 
     await ticket.save();
 
+    // The message just pushed doesn't come back populated from ticket.save()
+    // (it's a plain subdocument push, not a fresh query) — fetch just this
+    // one ticket's messages.sender populated so the live-emitted payload
+    // matches what getTicketById already returns for the initial page load.
+    const populatedTicket = await SupportTicket.findById(ticket._id)
+      .select("messages status")
+      .populate("messages.sender", "name role avatar");
+    const newMessage = populatedTicket.messages[populatedTicket.messages.length - 1];
+
+    // Live-push the new message to anyone with this ticket's thread open right now.
+    emitToTicket(ticket._id, "ticket:message", {
+      ticketId: ticket._id,
+      message: newMessage,
+      status: ticket.status,
+    });
+
     if (isAdmin) {
       // notify + email the ticket owner
-      await Notification.create({
+      await notifyUser({
         recipient: ticket.user,
         actor: req.user.id,
         type: "ticket_reply",
@@ -251,12 +268,16 @@ export const updateTicketStatus = async (req, res) => {
     ticket.status = status;
     await ticket.save();
 
-    await Notification.create({
+    await notifyUser({
       recipient: ticket.user,
       actor: req.user.id,
       type: "ticket_status_changed",
       ticket: ticket._id,
     });
+
+    // Live-push the status change to anyone with this thread open — lets
+    // the status badge update instantly instead of needing a refresh.
+    emitToTicket(ticket._id, "ticket:status", { ticketId: ticket._id, status });
 
     res.json({ success: true, message: "Status updated.", ticket });
   } catch (error) {
